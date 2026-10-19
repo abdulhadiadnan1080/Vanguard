@@ -1,0 +1,46 @@
+[
+  {
+    "id": "unreported-sibling-sites",
+    "models": ["MODEL_A"],
+    "description": "The same flaw exists at several sites; the report shows one. The model fixes the reported site and misses the siblings.",
+    "trigger": "Upstream fix repeats the same change at >= 2 separate sites (different functions or files); only one site is described in the report.",
+    "status": "supported",
+    "evidence": [
+      {"source": "the Python database driver task (hinted harness, 2026-10-14)", "runs": 2, "failures": 2, "note": "fixed the reported decoding path, still accepted encoded variants"},
+      {"source": "an earlier experiment track: the Java data-binding library, sibling variant (injected)", "runs": 3, "failures": 3, "note": "same 3 injected siblings missed in all runs"}
+    ],
+    "weight": 1.5,
+    "detect": {"min_repeated_fix_sites": 2},
+    "owner": "team",
+    "updated": "2026-10-15"
+  },
+  {
+    "id": "stacked-vulnerabilities",
+    "models": ["MODEL_B"],
+    "description": "Several distinct vulnerabilities in one task. The model fixes one, assumes it is done and stops, or runs out of time.",
+    "trigger": "Task requires fixing >= 2 independent vulnerabilities.",
+    "status": "supported",
+    "evidence": [
+      {"source": "an earlier experiment track: stacking", "runs": 7, "failures": 3, "note": "a budgeting app stopped early; an SSH library and a third project ran out of the 60-min limit (need 120-min reruns)"}
+    ],
+    "weight": 1.0,
+    "detect": {"min_advisories_same_repo": 2},
+    "owner": "team",
+    "updated": "2026-10-15"
+  },
+  {
+    "id": "single-explicit-check",
+    "models": ["MODEL_A", "MODEL_B"],
+    "description": "Anti-weakness: one missing check in one place, especially when the report names it. Both models solve these.",
+    "trigger": "Fix is 1 source file with <= 2 hunks, or the advisory title states the missing check.",
+    "status": "supported",
+    "evidence": [
+      {"source": "the Python auth library task (agentic, 2026-10-15)", "runs": 6, "failures": 0, "note": "both models 3/3"},
+      {"source": "the Python web toolkit task (manual review)", "runs": 2, "failures": 0, "note": "both reproduced the upstream line"}
+    ],
+    "weight": -1.0,
+    "detect": {"max_src_files": 1, "max_hunks": 2},
+    "owner": "team",
+    "updated": "2026-10-15"
+  }
+]

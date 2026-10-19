@@ -1,0 +1,7 @@
+{
+ "_about": "Local folders vanguard reads, relative to the private/ folder.",
+ "pipeline": "../../../your_pipeline",
+ "finder": "../../../your_finder",
+ "extra_job_dirs": [],
+ "task_namespace": "tasks"
+}

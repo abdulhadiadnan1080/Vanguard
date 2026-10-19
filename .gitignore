@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Private settings and generated data never belong in the repository.
+# vanguard also looks for them in a vanguard_local/ folder next to the repo.
+vanguard/private/
+vanguard/data/
+vanguard_local/

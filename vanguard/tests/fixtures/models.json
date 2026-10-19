@@ -1,0 +1,32 @@
+{
+ "_about": "Made-up models for the test suite.",
+ "agent_timeout_multiplier": 1000.0,
+ "models": [
+  {
+   "id": "MODEL_A",
+   "label": "Model A",
+   "match": [
+    "model-a"
+   ],
+   "aliases": [
+    "OLD_A"
+   ],
+   "harbor_model": "vendor-a/model-a",
+   "env_file": "fake.env",
+   "kwargs": []
+  },
+  {
+   "id": "MODEL_B",
+   "label": "Model B",
+   "match": [
+    "model-b"
+   ],
+   "aliases": [
+    "OLD_B"
+   ],
+   "harbor_model": "vendor-b/model-b",
+   "env_file": "fake.env",
+   "kwargs": []
+  }
+ ]
+}

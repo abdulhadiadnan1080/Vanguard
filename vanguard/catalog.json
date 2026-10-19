@@ -1,0 +1,50 @@
+{
+ "_about": "Curated knowledge the raw run data cannot supply: weaknesses found by controlled studies, and mitigations that change the outcome on purpose. Weaknesses with an automatic detect rule live in the project's weaknesses.json and are loaded from there. Which local task tests which weakness is project data and lives in private/task_tags.json.",
+ "weaknesses": [
+  {
+   "id": "producer-boundary",
+   "label": "Spotted risk dismissed with an assumption (check + data producer across a save/load boundary)",
+   "models": ["MODEL_A"],
+   "status": "supported",
+   "weight": 2.0,
+   "detect": "finder_producer_boundary",
+   "source": "controlled study: 20/20 runs failed in this shape; real task pass@3 = 0"
+  },
+  {
+   "id": "nearby-bug-capture",
+   "label": "A nearby real bug captures it and it argues itself out of the correct fix",
+   "models": ["MODEL_A"],
+   "status": "supported",
+   "weight": 1.0,
+   "detect": null,
+   "source": "controlled study: decoy variants failed (2/3 and 0.33); the no-decoy control was solved"
+  },
+  {
+   "id": "report-bounded-scope",
+   "label": "Scope stops at what the report describes; misses different kinds of flaw",
+   "models": ["MODEL_A"],
+   "status": "supported",
+   "weight": 1.0,
+   "detect": null,
+   "source": "controlled study: two multi-flaw variants scored 0.29 and 0.60; both single-flaw controls solved"
+  },
+  {
+   "id": "self-confirming-verification",
+   "label": "Verifies only the path it already fixed and stops on a green suite",
+   "models": ["MODEL_A"],
+   "status": "supported",
+   "weight": 0.0,
+   "detect": null,
+   "behavioural": true,
+   "source": "trajectory analysis: 0/12 failed runs tested the second path"
+  }
+ ],
+ "mitigations": [
+  {"id": "report-hint", "label": "The report names the second path", "weight": -1.5,
+   "source": "one sentence naming the path: solved 3/3"},
+  {"id": "visible-failing-test", "label": "A visible failing test exercises the second path", "weight": -1.5,
+   "source": "a visible failing test: solved 3/3"},
+  {"id": "generic-reminder", "label": "Generic reminder to check assumptions or cover every path", "weight": 0.0,
+   "source": "generic reminders: 0/6 solved"}
+ ]
+}

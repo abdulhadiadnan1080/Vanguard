@@ -1,0 +1,5 @@
+{
+  "builder_cmd": null,
+  "builder_timeout_min": 120,
+  "max_active": 3
+}

@@ -1,0 +1,22 @@
+{
+ "_about": "Which local task folder tests which weakness (curated).",
+ "task_tags": {
+  "example-task-variant-b": {
+   "weaknesses": [
+    "producer-boundary"
+   ]
+  },
+  "example-task-variant-b2": {
+   "weaknesses": [
+    "producer-boundary"
+   ],
+   "mitigations": [
+    "report-hint"
+   ]
+  },
+  "example-control": {
+   "weaknesses": [],
+   "note": "control"
+  }
+ }
+}

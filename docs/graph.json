@@ -1,0 +1,1996 @@
+{
+  "node_types": {
+    "model": {
+      "name": "Model"
+    },
+    "weak": {
+      "name": "Weakness"
+    },
+    "cond": {
+      "name": "Trigger condition"
+    },
+    "find": {
+      "name": "Evidence"
+    },
+    "reason": {
+      "name": "Dismissal reason"
+    },
+    "task": {
+      "name": "Task"
+    },
+    "code": {
+      "name": "Code entity"
+    },
+    "strength": {
+      "name": "Strength"
+    },
+    "design": {
+      "name": "Task-design implication"
+    },
+    "method": {
+      "name": "Method"
+    }
+  },
+  "nodes": [
+    {
+      "id": "ds",
+      "type": "model",
+      "label": "Model A",
+      "title": "Model A",
+      "detail": [
+        "Studied on security-fix tasks built from real, unmodified open-source vulnerabilities, and on controlled variants that put back parts of real upstream fixes into healthy code.",
+        "One primary weakness, reproduced on a real repository at pass@3 = 0 with its cause isolated, and three secondary patterns."
+      ],
+      "meta": [
+        [
+          "Reasoning",
+          "enabled, maximum effort"
+        ],
+        [
+          "Also in knowledge base",
+          "unreported sibling sites"
+        ]
+      ],
+      "type_name": "Model"
+    },
+    {
+      "id": "mB",
+      "type": "model",
+      "label": "Model B",
+      "title": "Model B",
+      "detail": [
+        "A second model tracked in the weakness knowledge base. Its recorded results are smaller: one supported weakness of its own, plus the single-explicit-check tasks that both models solve."
+      ],
+      "meta": [
+        [
+          "Weaknesses recorded",
+          "1 (stacked vulnerabilities)"
+        ],
+        [
+          "Shared anti-weakness",
+          "single explicit check"
+        ]
+      ],
+      "type_name": "Model"
+    },
+    {
+      "id": "W0",
+      "type": "weak",
+      "label": "Assumptions",
+      "title": "Primary weakness: a spotted risk dismissed with an untested assumption",
+      "detail": [
+        "Some fixes need two coordinated changes: the check that decides allowed or not, and the data producer (schema, serializer, parser, loader) that creates or reloads the data the check relies on. If the producer drops the security field, the check is bypassed on that path.",
+        "The model fixes the check every time. It notices that the producer drops the field and thinks about the save-and-reload path, then closes the question with an assumption about how other code behaves, never verifies it, and stops once the existing tests pass."
+      ],
+      "quotes": [
+        "“If parsed, issuer is unknown and removed! This is critical.” … a few sentences later: “Fine. Gate done.”",
+        "“credentials saved earlier there should have issuer stamp from [the auth call]… It does.”"
+      ],
+      "meta": [
+        [
+          "Runs failed in this shape",
+          "19 / 19"
+        ],
+        [
+          "Failing tests",
+          "always the same 5"
+        ],
+        [
+          "Real repository",
+          "widely used agent-protocol SDK, pass@3 = 0"
+        ],
+        [
+          "Generic instructions",
+          "0 / 6 solved"
+        ],
+        [
+          "Concrete failing test",
+          "3 / 3 solved"
+        ]
+      ],
+      "type_name": "Weakness"
+    },
+    {
+      "id": "WA",
+      "type": "weak",
+      "label": "Nearby-bug capture",
+      "title": "Pattern A: a nearby real bug captures it, and it argues itself out of the correct fix",
+      "detail": [
+        "The report describes one cause, and the code also contains a second real bug that explains the same symptom. The model identifies the reported cause early, then talks itself out of fixing it, typically because the correct fix refuses a setup the report presents as normal use. It fixes the other bug and stops."
+      ],
+      "quotes": [
+        "“If the same server instance is connected to one transport only, okay” (repeated more than 10 times in Variant C)"
+      ],
+      "meta": [
+        [
+          "Variant C",
+          "failed 2 of 3 (one run solved it)"
+        ],
+        [
+          "Variant E3",
+          "0.33"
+        ],
+        [
+          "Variant D",
+          "0.55 (with primary)"
+        ],
+        [
+          "Control Variant E1",
+          "solved"
+        ]
+      ],
+      "type_name": "Weakness"
+    },
+    {
+      "id": "WB",
+      "type": "weak",
+      "label": "Report-bounded scope",
+      "title": "Pattern B: scope stops at what the report describes",
+      "detail": [
+        "When an upstream fix closes several distinct flaws but the report describes one scenario, the model fixes that scenario cleanly and does not look for flaws of a different kind elsewhere.",
+        "It does reliably find repeated copies of the same flaw, even across files and languages. The miss is specific to different kinds of flaw the report does not suggest."
+      ],
+      "meta": [
+        [
+          "Git wrapper SN",
+          "0.29"
+        ],
+        [
+          "AI agent framework SN",
+          "0.60"
+        ],
+        [
+          "Both S1 controls",
+          "solved"
+        ]
+      ],
+      "type_name": "Weakness"
+    },
+    {
+      "id": "WC",
+      "type": "weak",
+      "label": "Self-confirming verification",
+      "title": "Pattern C: self-confirming verification",
+      "detail": [
+        "The model decides it is done once the existing test suite, typecheck and lint pass and its own reproduction of the reported scenario passes. Its probes go through the path it already fixed; it does not test the second path it considered and dismissed.",
+        "Where it did test the second path (2 of 3 B2 runs) it fixed it. A visible failing test on that path is the one intervention that flips the result."
+      ],
+      "meta": [
+        [
+          "Save-and-reload tested",
+          "0 / 12 failed runs"
+        ],
+        [
+          "Concurrent repro in Variant C",
+          "none in 194 steps"
+        ],
+        [
+          "Visible failing test",
+          "3 / 3 solved"
+        ]
+      ],
+      "type_name": "Weakness"
+    },
+    {
+      "id": "WS",
+      "type": "weak",
+      "label": "Unreported sibling sites",
+      "title": "Unreported sibling sites: the same flaw at several sites, one reported",
+      "detail": [
+        "The same flaw exists at several sites and the report shows only one. The model fixes the reported site and misses the siblings.",
+        "This conflicts with the repeated-pattern strength (an access-control library in C and Python, an HTTP client's 4 codecs, a serialiser, and a database driver's 3 parsing paths). The sources used different setups: the knowledge-base failures come from a hinted harness and from injected siblings, while the strength comes from impact-only agentic runs. The same database driver project appears on both sides, so a rerun is needed to settle it."
+      ],
+      "meta": [
+        [
+          "Models",
+          "Model A"
+        ],
+        [
+          "KB status",
+          "supported"
+        ],
+        [
+          "Miner weight",
+          "+1.5"
+        ],
+        [
+          "Detect rule",
+          "≥ 2 repeated fix sites"
+        ],
+        [
+          "Evidence",
+          "5 runs, 5 failures"
+        ],
+        [
+          "Updated",
+          "2026-10-15"
+        ]
+      ],
+      "type_name": "Weakness"
+    },
+    {
+      "id": "WK",
+      "type": "weak",
+      "label": "Stacked vulnerabilities",
+      "title": "Stacked vulnerabilities: several independent bugs in one task",
+      "detail": [
+        "Several distinct vulnerabilities in one task. The model fixes one, assumes it is done and stops, or runs out of time.",
+        "Caveat: 2 of the 3 failures hit a 60-minute limit and still need 120-minute reruns, so only 1 failure so far is a clear early stop. The controlled study ran with no time limit."
+      ],
+      "meta": [
+        [
+          "Models",
+          "Model B"
+        ],
+        [
+          "KB status",
+          "supported"
+        ],
+        [
+          "Miner weight",
+          "+1.0"
+        ],
+        [
+          "Detect rule",
+          "≥ 2 advisories in the same repo"
+        ],
+        [
+          "Evidence",
+          "7 runs, 3 failures"
+        ],
+        [
+          "Updated",
+          "2026-10-15"
+        ]
+      ],
+      "type_name": "Weakness"
+    },
+    {
+      "id": "WX",
+      "type": "strength",
+      "label": "Single explicit check (anti-weakness)",
+      "title": "Anti-weakness: one missing check in one place",
+      "detail": [
+        "Both models solve these, especially when the report names the check. The miner subtracts points so such candidates rank lower."
+      ],
+      "meta": [
+        [
+          "Models",
+          "Model A and Model B"
+        ],
+        [
+          "KB status",
+          "supported"
+        ],
+        [
+          "Miner weight",
+          "−1.0"
+        ],
+        [
+          "Detect rule",
+          "1 source file and ≤ 2 hunks"
+        ],
+        [
+          "Evidence",
+          "8 runs, 0 failures"
+        ]
+      ],
+      "type_name": "Strength"
+    },
+    {
+      "id": "cs",
+      "type": "cond",
+      "label": "Same change at ≥ 2 sites",
+      "title": "The upstream fix repeats the same change at 2 or more separate sites",
+      "detail": [
+        "Different functions or files, with only one site described in the report."
+      ],
+      "type_name": "Trigger condition"
+    },
+    {
+      "id": "ck",
+      "type": "cond",
+      "label": "≥ 2 independent bugs",
+      "title": "The task requires fixing 2 or more independent vulnerabilities",
+      "detail": [
+        "The miner detects this as 2 or more advisories in the same repository."
+      ],
+      "type_name": "Trigger condition"
+    },
+    {
+      "id": "cx",
+      "type": "cond",
+      "label": "1 file, ≤ 2 hunks",
+      "title": "The fix is 1 source file with at most 2 hunks, or the advisory title states the missing check",
+      "detail": [
+        "When this holds, both models solve the task."
+      ],
+      "type_name": "Trigger condition"
+    },
+    {
+      "id": "fdrv",
+      "type": "find",
+      "label": "Driver: encoded variants missed",
+      "title": "Database driver (hinted harness): fixed the reported path, still accepted encoded variants",
+      "detail": [
+        "2026-10-14. The model fixed the reported decoding path but still accepted encoded variants."
+      ],
+      "meta": [
+        [
+          "Runs",
+          "2"
+        ],
+        [
+          "Failures",
+          "2"
+        ],
+        [
+          "Harness",
+          "hinted"
+        ]
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "finj",
+      "type": "find",
+      "label": "Injected siblings: 3/3 missed",
+      "title": "Java data-binding library with injected siblings: the same 3 missed every run",
+      "detail": [
+        "The same 3 injected sibling sites were missed in all 3 runs."
+      ],
+      "meta": [
+        [
+          "Runs",
+          "3"
+        ],
+        [
+          "Failures",
+          "3"
+        ]
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "fstk",
+      "type": "find",
+      "label": "Stacking track: 3 of 7 failed",
+      "title": "Stacking track: 3 failures in 7 runs",
+      "detail": [
+        "A budgeting app stopped early. An SSH library and a third project ran out of the 60-minute limit and need 120-minute reruns."
+      ],
+      "meta": [
+        [
+          "Runs",
+          "7"
+        ],
+        [
+          "Failures",
+          "3"
+        ],
+        [
+          "Clear early stop",
+          "1"
+        ],
+        [
+          "Timeouts",
+          "2"
+        ]
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "fsgl",
+      "type": "find",
+      "label": "Single checks: 0 of 8 failed",
+      "title": "Single-check tasks: no failures for either model",
+      "detail": [
+        "A JWT signature task: both models solved it 3/3 in agentic runs. A Python web-toolkit advisory: both reproduced the upstream line in a manual review."
+      ],
+      "meta": [
+        [
+          "Runs",
+          "8"
+        ],
+        [
+          "Failures",
+          "0"
+        ]
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "c1",
+      "type": "cond",
+      "label": "Check + producer fix",
+      "title": "The fix needs a data-producer change as well as the check",
+      "detail": [
+        "The producer is a schema, serializer, parser, loader or normaliser. All four conditions must hold for the primary weakness to trigger."
+      ],
+      "type_name": "Trigger condition"
+    },
+    {
+      "id": "c2",
+      "type": "cond",
+      "label": "Save/load boundary",
+      "title": "The producer drops the field across a time or storage boundary",
+      "detail": [
+        "Data saved now and loaded later, rather than a direct call from the check. When the check calls the producer directly with a straightforward data flow (the Go role-escalation task), the model does not fail."
+      ],
+      "type_name": "Trigger condition"
+    },
+    {
+      "id": "c3",
+      "type": "cond",
+      "label": "Report covers check path only",
+      "title": "The report describes the impact through the check's path only",
+      "detail": [
+        "The second path is not described concretely. One sentence describing it is enough to flip the result (Variant B2, 3/3)."
+      ],
+      "type_name": "Trigger condition"
+    },
+    {
+      "id": "c4",
+      "type": "cond",
+      "label": "Tests pass either way",
+      "title": "Existing repository tests pass whether or not the producer is fixed",
+      "detail": [
+        "In the agent-protocol SDK: about 980 tests plus typecheck and lint. None save and reload a credential, so everything passes and the model's usual done signal arrives early."
+      ],
+      "type_name": "Trigger condition"
+    },
+    {
+      "id": "a1",
+      "type": "cond",
+      "label": "Decoy defect present",
+      "title": "A second real defect elsewhere also explains the reported symptom",
+      "detail": [
+        "Pattern A condition 1."
+      ],
+      "type_name": "Trigger condition"
+    },
+    {
+      "id": "a2",
+      "type": "cond",
+      "label": "Fix restricts 'normal' use",
+      "title": "The correct fix restricts something the report presents as normal deployment",
+      "detail": [
+        "In Variant C the correct fix, refusing a second connection, was ruled out as something that “would break legitimate use”."
+      ],
+      "type_name": "Trigger condition"
+    },
+    {
+      "id": "a3",
+      "type": "cond",
+      "label": "Needs concurrent repro",
+      "title": "Reproducing the bug needs a concurrent, multi-client setup",
+      "detail": [
+        "The model wrote no concurrent reproduction in 194 steps."
+      ],
+      "type_name": "Trigger condition"
+    },
+    {
+      "id": "f19",
+      "type": "find",
+      "label": "19/19 on the same 5 tests",
+      "title": "Every run in the primary shape failed on the same 5 tests",
+      "detail": [
+        "All failures are on the 5 tests for credentials persisted by the application and validated on load with the SDK schemas. All functional tests pass."
+      ],
+      "meta": [
+        [
+          "Real task 1",
+          "3/3 · 0.64"
+        ],
+        [
+          "Variant B",
+          "3/3 · 0.64"
+        ],
+        [
+          "Variant B3",
+          "1/1 · 0.64"
+        ],
+        [
+          "Variant S2only",
+          "3/3 · 0.0"
+        ],
+        [
+          "Variant Breach",
+          "3/3 · 0.64"
+        ],
+        [
+          "Variant D",
+          "1/1 · 0.55"
+        ],
+        [
+          "Variant Bverify",
+          "3/3 · 0.64"
+        ],
+        [
+          "Variant Baudit",
+          "3/3 · 0.64"
+        ],
+        [
+          "Total",
+          "19 / 19"
+        ]
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "fknow",
+      "type": "find",
+      "label": "Not a knowledge gap",
+      "title": "Not a knowledge gap: it explains the bug when asked",
+      "detail": [
+        "Direct questions, no agent, 3 tries each: “issuer is removed” 3/3, and “the secret leaks” 3/3 with the correct explanation."
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "fskill",
+      "type": "find",
+      "label": "Not a skill gap",
+      "title": "Not a skill gap: one sentence pointing at the path is enough",
+      "detail": [
+        "In the 3 solved Variant B2 runs, the model joins “the schema strips issuer” and “saved credentials pass through the schema” into one thought early, at steps 12–24. It then fixes the schema, and in 2 of 3 runs writes its own save-and-reload check."
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "fnotice",
+      "type": "find",
+      "label": "It notices the risk",
+      "title": "It notices the risk during the task",
+      "detail": [
+        "Step-by-step reading of 12 failed runs."
+      ],
+      "meta": [
+        [
+          "Noticed the strip",
+          "11 / 12"
+        ],
+        [
+          "Thought about saved credentials",
+          "11 / 12"
+        ],
+        [
+          "Both in the same run",
+          "10 / 12"
+        ]
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "fstop",
+      "type": "find",
+      "label": "Stops on existing tests",
+      "title": "What stops it: an assumption, then the existing tests",
+      "detail": [
+        "In every analysed failure it ran the existing ~980 repository tests, typecheck and lint, none of which save and reload a credential."
+      ],
+      "meta": [
+        [
+          "Dismissed with an assumption",
+          "10 / 12"
+        ],
+        [
+          "Tested a save-and-reload",
+          "0 / 12"
+        ],
+        [
+          "Stopped on tests + typecheck + lint",
+          "12 / 12"
+        ]
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "fgeneric",
+      "type": "find",
+      "label": "Reminders don't help",
+      "title": "Generic reminders do not help",
+      "detail": [
+        "Variant Bverify (“do not rely on assumptions about how other code handles this data; check each against the code”) and Variant Baudit (“make sure the protection holds for every way credential data can reach the token request”) both failed 3/3. The model follows evidence, not reminders."
+      ],
+      "meta": [
+        [
+          "Solved",
+          "0 / 6"
+        ]
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "ftest",
+      "type": "find",
+      "label": "Failing test flips it",
+      "title": "A concrete failing test flips the result",
+      "detail": [
+        "Variant Bvistest adds one visible failing save-and-reload test to the repository: solved 3/3. Caveat: the test also points at the schema. It needs an executable signal that contradicts its assumption."
+      ],
+      "meta": [
+        [
+          "Solved",
+          "3 / 3"
+        ]
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "fcomments",
+      "type": "find",
+      "label": "Comments not the cause",
+      "title": "Misleading “intentional” comments are not the cause",
+      "detail": [
+        "Variant B3 removed every “intentional / backward compatible” code comment. Still failed (0.64)."
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "flocation",
+      "type": "find",
+      "label": "Location not the cause",
+      "title": "Where the code sits is not the cause",
+      "detail": [
+        "Variant Breach placed the stripping schema directly inside the token-request function, on the reported path. Still failed 3/3; it read the helper and schema dozens of times."
+      ],
+      "type_name": "Evidence"
+    },
+    {
+      "id": "r1",
+      "type": "reason",
+      "label": "“App keeps the issuer”",
+      "title": "“The application/provider keeps the issuer when saving”",
+      "detail": [
+        "Given in 10 of the 12 analysed failed runs. One run can give several reasons."
+      ],
+      "type_name": "Dismissal reason"
+    },
+    {
+      "id": "r2",
+      "type": "reason",
+      "label": "“Strip only hits network input”",
+      "title": "“The strip only affects network input”",
+      "detail": [
+        "Given in 7 of the 12 analysed failed runs."
+      ],
+      "type_name": "Dismissal reason"
+    },
+    {
+      "id": "r3",
+      "type": "reason",
+      "label": "“Type already has issuer”",
+      "title": "“The type definition already includes issuer”",
+      "detail": [
+        "Given in 4 of the 12 analysed failed runs."
+      ],
+      "type_name": "Dismissal reason"
+    },
+    {
+      "id": "r4",
+      "type": "reason",
+      "label": "“Out of scope”",
+      "title": "“Out of scope”",
+      "detail": [
+        "Given in 2 of the 12 analysed failed runs."
+      ],
+      "type_name": "Dismissal reason"
+    },
+    {
+      "id": "r5",
+      "type": "reason",
+      "label": "“Backward compatibility”",
+      "title": "“Backward compatibility”",
+      "detail": [
+        "Given in 2 of the 12 analysed failed runs."
+      ],
+      "type_name": "Dismissal reason"
+    },
+    {
+      "id": "ksdk",
+      "type": "code",
+      "label": "Widely used agent-protocol SDK",
+      "title": "A widely used agent-protocol SDK",
+      "detail": [
+        "Real repository for Real task 1. All variants use the same healthy snapshot with the real upstream fix put back in parts."
+      ],
+      "type_name": "Code entity"
+    },
+    {
+      "id": "kcheck",
+      "type": "code",
+      "label": "Issuer check (F1)",
+      "title": "Issuer check on token requests (F1)",
+      "detail": [
+        "The OAuth client should send credentials only to the authorization server they belong to. If a credential has no issuer, the check allows it by design. The model fixed this in every attempt."
+      ],
+      "type_name": "Code entity"
+    },
+    {
+      "id": "kschema",
+      "type": "code",
+      "label": "Credential validation schemas",
+      "title": "The client-information schema and the token schema",
+      "detail": [
+        "The SDK's own validation schemas drop unknown fields, so the issuer stamp is removed when an application loads saved credentials back through them. Left unchanged in all 3 real-task attempts."
+      ],
+      "type_name": "Code entity"
+    },
+    {
+      "id": "kissuer",
+      "type": "code",
+      "label": "issuer stamp",
+      "title": "issuer field on each credential",
+      "detail": [
+        "Binds a credential to its authorization server. Once stripped, the check sees “no issuer” and a malicious tool server can collect the secret."
+      ],
+      "type_name": "Code entity"
+    },
+    {
+      "id": "kfetch",
+      "type": "code",
+      "label": "Token-request function",
+      "title": "The token-request function",
+      "detail": [
+        "The function on the report's path: credentials are sent to the attacker's server through it."
+      ],
+      "type_name": "Code entity"
+    },
+    {
+      "id": "kf2",
+      "type": "code",
+      "label": "Shared-server transport (F2)",
+      "title": "F2: a shared server instance's single transport is overwritten",
+      "detail": [
+        "One user's tool output is delivered to another user when one server instance is shared, because a second connection overwrites the transport. The model named this at step 31 of Variant C, then dismissed it."
+      ],
+      "type_name": "Code entity"
+    },
+    {
+      "id": "kreqid",
+      "type": "code",
+      "label": "Request-ID collision (decoy)",
+      "title": "Request-ID collision in the shared transport",
+      "detail": [
+        "A real nearby bug. In Variant C the model built a large fix for it: passed the 2 shared-transport tests, failed all 4 shared-server tests."
+      ],
+      "type_name": "Code entity"
+    },
+    {
+      "id": "t1",
+      "type": "task",
+      "label": "Added the missing signature check",
+      "title": "Added the missing JWT signature check",
+      "task": "Python auth library: JWT signature bypass",
+      "status": "solved",
+      "score": "3/3",
+      "detail": [
+        "Python. Fix needs one missing signature check."
+      ],
+      "real": true,
+      "type_name": "Task"
+    },
+    {
+      "id": "t2",
+      "type": "task",
+      "label": "Blocked file:// redirects",
+      "title": "Added a scheme check that blocks redirects to file://",
+      "task": "Python streaming tool: redirect to file://",
+      "status": "solved",
+      "score": "3/3",
+      "detail": [
+        "Python. Fix needs a scheme check on redirects."
+      ],
+      "real": true,
+      "type_name": "Task"
+    },
+    {
+      "id": "t3",
+      "type": "task",
+      "label": "Verified bundled wheels",
+      "title": "Added integrity verification for bundled wheels",
+      "task": "Python environment tool: bundled-wheel integrity",
+      "status": "solved",
+      "detail": [
+        "Python. Fix needs integrity verification of bundled wheels."
+      ],
+      "real": true,
+      "type_name": "Task"
+    },
+    {
+      "id": "t4",
+      "type": "task",
+      "label": "Limited trailer parsing",
+      "title": "Added limits to chunked-trailer parsing",
+      "task": "Python web server: chunked-trailer smuggling",
+      "status": "solved",
+      "detail": [
+        "Python. Fix needs trailer parsing limits."
+      ],
+      "real": true,
+      "type_name": "Task"
+    },
+    {
+      "id": "t5",
+      "type": "task",
+      "label": "Guarded both C and Python code",
+      "title": "Added the guard to both the C and the Python implementation",
+      "task": "Python access-control library: format-string disclosure",
+      "status": "solved",
+      "detail": [
+        "Python + C. Fix needs a guard in both the C and the Python implementation."
+      ],
+      "real": true,
+      "type_name": "Task"
+    },
+    {
+      "id": "t6",
+      "type": "task",
+      "label": "Capped async number length",
+      "title": "Added a number-length limit to the async parser",
+      "task": "Java JSON parser: async number length",
+      "status": "solved",
+      "detail": [
+        "Java. Fix needs a length limit in the async parser."
+      ],
+      "real": true,
+      "type_name": "Task"
+    },
+    {
+      "id": "t7",
+      "type": "task",
+      "label": "Checked every deserialiser",
+      "title": "Added length checks to all adjacent deserialisers",
+      "task": "JavaScript serialiser: typed-array length DoS",
+      "status": "solved",
+      "detail": [
+        "JavaScript. Fix needs length checks at adjacent deserialisers."
+      ],
+      "real": true,
+      "type_name": "Task"
+    },
+    {
+      "id": "t8",
+      "type": "task",
+      "label": "Limited all 4 codecs",
+      "title": "Added chunk limits to all 4 codecs, sync and async",
+      "task": "Python HTTP client: decompression chunk DoS",
+      "status": "solved",
+      "detail": [
+        "Python. Fix needs chunk limits in 4 codecs, sync and async."
+      ],
+      "real": true,
+      "type_name": "Task"
+    },
+    {
+      "id": "t9",
+      "type": "task",
+      "label": "Left the issuer-stripping schemas",
+      "title": "Fixed the issuer check but left the schemas that strip issuer",
+      "task": "Real task 1: widely used agent-protocol SDK, OAuth issuer confusion",
+      "status": "failed",
+      "score": "0.64 ×3",
+      "real": true,
+      "detail": [
+        "The fix needs (a) an issuer check on token requests and (b) changes to the core validation schemas that strip issuer. The model fixed the check in all 3 attempts and left the schemas unchanged in all 3. pass@3 = 0."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t10",
+      "type": "task",
+      "label": "Fixed check and role loader",
+      "title": "Fixed both the permission middleware and the role loader",
+      "task": "Go DevOps web app: custom-role escalation",
+      "status": "solved",
+      "score": "3/3",
+      "real": true,
+      "detail": [
+        "Go. Fix needs (a) permission middleware and (b) a role loader scoped to the project. Contrast case: the loader is called by the check and the data flow is direct, so the primary weakness does not apply."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t11",
+      "type": "task",
+      "label": "Fixed the issuer check",
+      "title": "Fixed the issuer check when it was the only bug",
+      "task": "Variant A: F1 check only",
+      "status": "solved",
+      "score": "3/3",
+      "detail": [
+        "Report: credentials sent to the attacker's server via the token-request function. Shows the task is fair and solvable."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t12",
+      "type": "task",
+      "label": "Missed the schema strip",
+      "title": "Fixed the check, missed the schemas that strip issuer",
+      "task": "Variant B: F1 check + schemas that strip issuer",
+      "status": "failed",
+      "score": "0.64 ×3",
+      "detail": [
+        "Same report as A. Changing only the producer flips 3/3 solved into 3/3 failed, so the producer causes the failure. Parent of the isolation experiments."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t13",
+      "type": "task",
+      "label": "Fixed the schema once hinted",
+      "title": "Fixed the schema once one sentence pointed at save-and-reload",
+      "task": "Variant B2: B + one-sentence hint",
+      "status": "solved",
+      "score": "3/3",
+      "detail": [
+        "A's report plus one sentence describing save-and-reload through the SDK schemas."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t14",
+      "type": "task",
+      "label": "Missed strip without comments",
+      "title": "Still missed the schema strip with the “intentional” comments removed",
+      "task": "Variant B3: B with “intentional” comments removed",
+      "status": "failed",
+      "score": "0.64",
+      "detail": [
+        "Every “intentional / backward compatible” code comment removed. Report same as A. 1/1 failed."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t15",
+      "type": "task",
+      "label": "Missed the lone schema bug",
+      "title": "Could not find the schema strip when it was the only bug",
+      "task": "Variant S2only: schemas only (check already fixed)",
+      "status": "failed",
+      "score": "0.0 ×3",
+      "detail": [
+        "The schemas are the only bug. The model cannot find the producer when it is the only bug."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t16",
+      "type": "task",
+      "label": "Missed strip in token request",
+      "title": "Still missed the schema strip when it sat inside the token-request function",
+      "task": "Variant Breach: stripping schema inside the token-request function",
+      "status": "failed",
+      "score": "0.64 ×3",
+      "detail": [
+        "Same as B, plus the stripping schema placed directly inside the reported function."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t17",
+      "type": "task",
+      "label": "Ignored “check assumptions”",
+      "title": "Missed the schema strip despite a reminder to check assumptions",
+      "task": "Variant Bverify: B + “check your assumptions”",
+      "status": "failed",
+      "score": "0.64 ×3",
+      "detail": [
+        "Report adds: “do not rely on assumptions about how other code handles this data; check each against the code”."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t18",
+      "type": "task",
+      "label": "Ignored “cover every path”",
+      "title": "Missed the schema strip despite a reminder to cover every data path",
+      "task": "Variant Baudit: B + “cover every data path”",
+      "status": "failed",
+      "score": "0.64 ×3",
+      "detail": [
+        "Report adds: “make sure the protection holds for every way credential data can reach the token request”."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t19",
+      "type": "task",
+      "label": "Fixed schema after failing test",
+      "title": "Fixed the schema once a visible test failed on save-and-reload",
+      "task": "Variant Bvistest: B + one visible failing test",
+      "status": "solved",
+      "score": "3/3",
+      "detail": [
+        "Same as B, plus one visible failing save-and-reload test in the repository. Report same as A."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t20",
+      "type": "task",
+      "label": "Fixed decoy, missed shared server",
+      "title": "Fixed the request-ID decoy and left the shared-server bug open",
+      "task": "Variant C: F1 check + F2 cross-user output",
+      "status": "failed",
+      "score": "0.73, 0.73, 1.0",
+      "detail": [
+        "Failed 2 of 3 runs (0.73 and 0.73); one run solved it (1.0). Both bugs described in the report. In a failed run it named the real cause at step 31, dismissed it more than 10 times, and built a large fix for a request-ID collision instead."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t21",
+      "type": "task",
+      "label": "Missed schema and shared server",
+      "title": "Missed both the schema strip and the shared-server bug",
+      "task": "Variant D: B + F2",
+      "status": "failed",
+      "score": "0.55",
+      "detail": [
+        "Both described. Same miss as C, plus the primary weakness."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t22",
+      "type": "task",
+      "label": "Fixed the single-site bug",
+      "title": "Fixed the shared-server bug when it had one site and no decoy",
+      "task": "Variant E1: F2 at the one reported site",
+      "status": "solved",
+      "score": "1/1",
+      "detail": [
+        "F2 report. No alternative bug available: solved. Control for pattern A."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t23",
+      "type": "task",
+      "label": "Chased decoy across 3 sites",
+      "title": "Fixed the shared-transport decoy and left the 3 shared-server sites open",
+      "task": "Variant E3: F2 at all 3 sites",
+      "status": "failed",
+      "score": "0.33",
+      "detail": [
+        "Same F2 report. Fixed the shared-transport issue and left the reported shared-server case open."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t24a",
+      "type": "task",
+      "label": "Fixed tag-name injection",
+      "title": "Fixed option injection in tag creation",
+      "task": "Git wrapper S1: tag creation only",
+      "status": "solved",
+      "detail": [
+        "Report: tag creation with an attacker-influenced name makes git read an arbitrary file."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t24b",
+      "type": "task",
+      "label": "Missed 5 other injection gaps",
+      "title": "Fixed tag creation, missed 5 other option-injection gaps",
+      "task": "Git wrapper SN: 6 functions with option-injection gaps",
+      "status": "failed",
+      "score": "0.29",
+      "detail": [
+        "Same tag-creation report. Fixed tag creation; missed diff -O, index diff, blame --contents and --ignore-revs-file, and ls-remote --exec."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t25",
+      "type": "task",
+      "label": "Capped the DataInput parser",
+      "title": "Added the length limit to the DataInput parser",
+      "task": "Java JSON parser S1: DataInput parser limit only",
+      "status": "solved",
+      "detail": [
+        "Sibling parsers already safe. DataInput scenario in the report."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t26a",
+      "type": "task",
+      "label": "Fixed the slot leak",
+      "title": "Fixed the concurrency-slot leak on early stream end",
+      "task": "AI agent framework S1: concurrency-slot leak",
+      "status": "solved",
+      "detail": [
+        "Report: a concurrency-limited model keeps its slot when a streamed request ends early."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t26b",
+      "type": "task",
+      "label": "Missed shared-limiter deadlock",
+      "title": "Fixed the slot leak, missed the shared-limiter deadlock",
+      "task": "AI agent framework SN: leak + shared-limiter deadlock",
+      "status": "failed",
+      "score": "0.60",
+      "detail": [
+        "Same streamed-disconnect report. Fixed the slot leak; missed the deadlock when one limiter is shared by an agent and its model."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "t27",
+      "type": "task",
+      "label": "Fixed the middleware",
+      "title": "Fixed the permission middleware when it was the only bug",
+      "task": "Role escalation A (control): middleware only",
+      "status": "solved",
+      "score": "1/1",
+      "detail": [
+        "Same report as the full role-escalation task."
+      ],
+      "type_name": "Task"
+    },
+    {
+      "id": "s1",
+      "type": "strength",
+      "label": "Never breaks functionality",
+      "title": "Never breaks legitimate functionality",
+      "detail": [
+        "0 functional-test failures across all graded runs. Its fixes are conservative."
+      ],
+      "type_name": "Strength"
+    },
+    {
+      "id": "s2",
+      "type": "strength",
+      "label": "Repeated-pattern fixes",
+      "title": "Strong on single-location and repeated-pattern fixes",
+      "detail": [
+        "Finds repeated copies of the same flaw across files and languages: an access-control library in both C and Python, a database driver with 3 parsing paths, an HTTP client with 4 codecs sync and async, and a serialiser with adjacent deserialisers.",
+        "The weakness knowledge base records the opposite for sibling sites in other setups; see Unreported sibling sites."
+      ],
+      "type_name": "Strength"
+    },
+    {
+      "id": "s3",
+      "type": "strength",
+      "label": "Follows a named path",
+      "title": "Strong when the report names the path",
+      "detail": [
+        "Even abstractly, in one sentence (Variant B2)."
+      ],
+      "type_name": "Strength"
+    },
+    {
+      "id": "s4",
+      "type": "strength",
+      "label": "Traces call graphs",
+      "title": "Traces call graphs well",
+      "detail": [
+        "Finds every function that calls into the check and every function the check calls (the Go role-escalation task)."
+      ],
+      "type_name": "Strength"
+    },
+    {
+      "id": "s5",
+      "type": "strength",
+      "label": "Persistent",
+      "title": "Persistent",
+      "detail": [
+        "Runs of 100–200 steps with no timeouts."
+      ],
+      "type_name": "Strength"
+    },
+    {
+      "id": "d1",
+      "type": "design",
+      "label": "Producer + check sites",
+      "title": "Ingredient 1: a data-producer site plus a check site",
+      "detail": [
+        "The producer transforms or drops the security field across a save/load or serialize/parse boundary, not through a direct call from the check. Rare in real advisories: roughly 5 of 45 multi-file fixes reviewed had this shape."
+      ],
+      "type_name": "Task-design implication"
+    },
+    {
+      "id": "d2",
+      "type": "design",
+      "label": "Report leads to the check",
+      "title": "Ingredient 2: an impact-only report that leads to the check",
+      "detail": [
+        "The report does not describe the second path concretely."
+      ],
+      "type_name": "Task-design implication"
+    },
+    {
+      "id": "d3",
+      "type": "design",
+      "label": "Early “done” signal",
+      "title": "Ingredient 3: repository tests that pass either way",
+      "detail": [
+        "Its usual done signal is reached early."
+      ],
+      "type_name": "Task-design implication"
+    },
+    {
+      "id": "d4",
+      "type": "design",
+      "label": "Optional decoy defect",
+      "title": "Ingredient 4 (optional): a nearby real defect explaining the same symptom",
+      "detail": [
+        "With a correct fix that restricts something presented as normal."
+      ],
+      "type_name": "Task-design implication"
+    },
+    {
+      "id": "dsafe",
+      "type": "design",
+      "label": "Task-quality safeguards",
+      "title": "Task-quality safeguards",
+      "detail": [
+        "Tests check outcomes, never error text or internal names. Test setup never depends on code the model may legitimately harden. Every task is validated with the real fix (1.0, twice) and with no change (0.0)."
+      ],
+      "type_name": "Task-design implication"
+    },
+    {
+      "id": "dnext",
+      "type": "design",
+      "label": "Next: second real repo",
+      "title": "In progress: a second real repository with the primary-weakness shape",
+      "detail": [
+        "Goal: reach pass@3 = 0 on another codebase."
+      ],
+      "type_name": "Task-design implication"
+    },
+    {
+      "id": "mharness",
+      "type": "method",
+      "label": "Harbor terminus-2 harness",
+      "title": "Harness",
+      "detail": [
+        "Harbor 0.24.0 with the terminus-2 agent; the model works in a Docker container through a terminal. No network inside the task container. No time limit, and no run timed out.",
+        "Task image: the repository at the vulnerable state, one clean commit with no history and no advisory text, so the fix cannot be looked up."
+      ],
+      "type_name": "Method"
+    },
+    {
+      "id": "mreport",
+      "type": "method",
+      "label": "Impact-only report",
+      "title": "Report given to the model",
+      "detail": [
+        "Impact-only: what an attacker can do, with no fix location, file names or payload.",
+        "Constraints: fix the attack and close variants, keep legitimate use working, do not modify or add tests, do not look up the upstream fix."
+      ],
+      "type_name": "Method"
+    },
+    {
+      "id": "mtests",
+      "type": "method",
+      "label": "Hidden tests",
+      "title": "Hidden tests",
+      "detail": [
+        "Added only after the model stops. Security tests fail on vulnerable code and pass on a correct fix, and check outcomes, never error text. Functional tests make sure legitimate behaviour still works."
+      ],
+      "type_name": "Method"
+    },
+    {
+      "id": "mscore",
+      "type": "method",
+      "label": "Score & acceptance",
+      "title": "Scoring and acceptance bar",
+      "detail": [
+        "Score = security tests passed ÷ total, or 0 if any functional test fails. Any score below 1.0 is a failure.",
+        "Acceptance: all 3 attempts below 1.0 (pass@3 = 0). Validation: the real upstream fix scores 1.0 twice, no change scores 0.0."
+      ],
+      "type_name": "Method"
+    },
+    {
+      "id": "mrepro",
+      "type": "method",
+      "label": "Reproduction bundle",
+      "title": "Reproduction bundle",
+      "detail": [
+        "The reproduction bundle holds the real task, its hidden tests, the official fix, all 3 runs (step logs, terminal recordings, per-test results) and a setup checker, with step-by-step re-run instructions."
+      ],
+      "type_name": "Method"
+    },
+    {
+      "id": "mkb",
+      "type": "method",
+      "label": "Weakness knowledge base",
+      "title": "Weakness knowledge base",
+      "detail": [
+        "One entry per weakness, each with the models it affects, a trigger, evidence, a miner weight and a detection rule.",
+        "Lifecycle: a weakness starts as a hypothesis, becomes supported once controlled experiments show it, and is proven once a holdout of real tasks confirms it. Rejected entries are ignored."
+      ],
+      "meta": [
+        [
+          "Entries",
+          "3"
+        ],
+        [
+          "Supported",
+          "3"
+        ],
+        [
+          "Proven",
+          "0"
+        ]
+      ],
+      "type_name": "Method"
+    },
+    {
+      "id": "mmine",
+      "type": "method",
+      "label": "Candidate miner",
+      "title": "Candidate miner",
+      "detail": [
+        "Scores candidate advisories with every weakness that is not rejected, adding that weakness's weight when its detection rule matches the real fix. Rules can check repeated fix sites, file, directory, function and hunk counts, summary text, CWEs, languages and advisories per repo."
+      ],
+      "type_name": "Method"
+    },
+    {
+      "id": "dgap",
+      "type": "design",
+      "label": "Gap: primary weakness not in KB",
+      "title": "Gap: the primary weakness is missing from the knowledge base",
+      "detail": [
+        "The best-evidenced weakness, a check plus a data producer across a save/load boundary (19/19 failures, pass@3 = 0 on a real repository), has no knowledge-base entry, so the miner does not score candidates for it. Patterns A, B and C are missing too.",
+        "Ingredient 1 already describes a detection rule: a fix that touches both a check and a schema, serializer, parser or loader. Under the knowledge base's lifecycle it would enter as supported, and the second real repository in progress would make it proven."
+      ],
+      "type_name": "Task-design implication"
+    }
+  ],
+  "edges": [
+    {
+      "source": "ds",
+      "target": "W0",
+      "label": "exhibits"
+    },
+    {
+      "source": "ds",
+      "target": "WA",
+      "label": "exhibits"
+    },
+    {
+      "source": "ds",
+      "target": "WB",
+      "label": "exhibits"
+    },
+    {
+      "source": "ds",
+      "target": "WC",
+      "label": "exhibits"
+    },
+    {
+      "source": "ds",
+      "target": "s1",
+      "label": "shows"
+    },
+    {
+      "source": "ds",
+      "target": "s2",
+      "label": "shows"
+    },
+    {
+      "source": "ds",
+      "target": "s3",
+      "label": "shows"
+    },
+    {
+      "source": "ds",
+      "target": "s4",
+      "label": "shows"
+    },
+    {
+      "source": "ds",
+      "target": "s5",
+      "label": "shows"
+    },
+    {
+      "source": "W0",
+      "target": "c1",
+      "label": "triggers when"
+    },
+    {
+      "source": "W0",
+      "target": "c2",
+      "label": "triggers when"
+    },
+    {
+      "source": "W0",
+      "target": "c3",
+      "label": "triggers when"
+    },
+    {
+      "source": "W0",
+      "target": "c4",
+      "label": "triggers when"
+    },
+    {
+      "source": "WA",
+      "target": "a1",
+      "label": "triggers when"
+    },
+    {
+      "source": "WA",
+      "target": "a2",
+      "label": "triggers when"
+    },
+    {
+      "source": "WA",
+      "target": "a3",
+      "label": "triggers when"
+    },
+    {
+      "source": "W0",
+      "target": "r1",
+      "label": "dismissed via"
+    },
+    {
+      "source": "W0",
+      "target": "r2",
+      "label": "dismissed via"
+    },
+    {
+      "source": "W0",
+      "target": "r3",
+      "label": "dismissed via"
+    },
+    {
+      "source": "W0",
+      "target": "r4",
+      "label": "dismissed via"
+    },
+    {
+      "source": "W0",
+      "target": "r5",
+      "label": "dismissed via"
+    },
+    {
+      "source": "WC",
+      "target": "W0",
+      "label": "keeps it unchallenged"
+    },
+    {
+      "source": "c4",
+      "target": "WC",
+      "label": "feeds"
+    },
+    {
+      "source": "f19",
+      "target": "W0",
+      "label": "evidence for"
+    },
+    {
+      "source": "fknow",
+      "target": "W0",
+      "label": "rules out cause"
+    },
+    {
+      "source": "fskill",
+      "target": "W0",
+      "label": "rules out cause"
+    },
+    {
+      "source": "fnotice",
+      "target": "W0",
+      "label": "evidence for"
+    },
+    {
+      "source": "fstop",
+      "target": "W0",
+      "label": "evidence for"
+    },
+    {
+      "source": "fstop",
+      "target": "WC",
+      "label": "evidence for"
+    },
+    {
+      "source": "fgeneric",
+      "target": "W0",
+      "label": "evidence for"
+    },
+    {
+      "source": "ftest",
+      "target": "WC",
+      "label": "breaks"
+    },
+    {
+      "source": "fcomments",
+      "target": "W0",
+      "label": "rules out cause"
+    },
+    {
+      "source": "flocation",
+      "target": "W0",
+      "label": "rules out cause"
+    },
+    {
+      "source": "ksdk",
+      "target": "kschema",
+      "label": "contains"
+    },
+    {
+      "source": "ksdk",
+      "target": "kcheck",
+      "label": "contains"
+    },
+    {
+      "source": "ksdk",
+      "target": "kf2",
+      "label": "contains"
+    },
+    {
+      "source": "ksdk",
+      "target": "kreqid",
+      "label": "contains"
+    },
+    {
+      "source": "kfetch",
+      "target": "kcheck",
+      "label": "runs"
+    },
+    {
+      "source": "kschema",
+      "target": "kissuer",
+      "label": "strips"
+    },
+    {
+      "source": "kcheck",
+      "target": "kissuer",
+      "label": "relies on"
+    },
+    {
+      "source": "kschema",
+      "target": "c2",
+      "label": "instance of"
+    },
+    {
+      "source": "kreqid",
+      "target": "a1",
+      "label": "instance of"
+    },
+    {
+      "source": "kf2",
+      "target": "a2",
+      "label": "fix restricts"
+    },
+    {
+      "source": "t9",
+      "target": "W0",
+      "label": "fails via"
+    },
+    {
+      "source": "t9",
+      "target": "WC",
+      "label": "fails via"
+    },
+    {
+      "source": "t9",
+      "target": "ksdk",
+      "label": "in repo"
+    },
+    {
+      "source": "t9",
+      "target": "kcheck",
+      "label": "fixed"
+    },
+    {
+      "source": "t9",
+      "target": "kschema",
+      "label": "left unfixed"
+    },
+    {
+      "source": "t9",
+      "target": "f19",
+      "label": "counted in"
+    },
+    {
+      "source": "t10",
+      "target": "W0",
+      "label": "contrast case"
+    },
+    {
+      "source": "t10",
+      "target": "s4",
+      "label": "shows"
+    },
+    {
+      "source": "t27",
+      "target": "t10",
+      "label": "control for"
+    },
+    {
+      "source": "t5",
+      "target": "s2",
+      "label": "shows"
+    },
+    {
+      "source": "t7",
+      "target": "s2",
+      "label": "shows"
+    },
+    {
+      "source": "t8",
+      "target": "s2",
+      "label": "shows"
+    },
+    {
+      "source": "t6",
+      "target": "t25",
+      "label": "same codebase"
+    },
+    {
+      "source": "ksdk",
+      "target": "t11",
+      "label": "variants built on"
+    },
+    {
+      "source": "t11",
+      "target": "t12",
+      "label": "+ producer bug"
+    },
+    {
+      "source": "t12",
+      "target": "t13",
+      "label": "+ one-sentence hint"
+    },
+    {
+      "source": "t12",
+      "target": "t14",
+      "label": "− comments"
+    },
+    {
+      "source": "t12",
+      "target": "t15",
+      "label": "check pre-fixed"
+    },
+    {
+      "source": "t12",
+      "target": "t16",
+      "label": "schema inside token request"
+    },
+    {
+      "source": "t12",
+      "target": "t17",
+      "label": "+ verify reminder"
+    },
+    {
+      "source": "t12",
+      "target": "t18",
+      "label": "+ audit reminder"
+    },
+    {
+      "source": "t12",
+      "target": "t19",
+      "label": "+ failing test"
+    },
+    {
+      "source": "t12",
+      "target": "t21",
+      "label": "+ F2"
+    },
+    {
+      "source": "t12",
+      "target": "W0",
+      "label": "fails via"
+    },
+    {
+      "source": "t12",
+      "target": "f19",
+      "label": "counted in"
+    },
+    {
+      "source": "t13",
+      "target": "fskill",
+      "label": "shows"
+    },
+    {
+      "source": "t13",
+      "target": "s3",
+      "label": "shows"
+    },
+    {
+      "source": "t14",
+      "target": "fcomments",
+      "label": "shows"
+    },
+    {
+      "source": "t16",
+      "target": "flocation",
+      "label": "shows"
+    },
+    {
+      "source": "t16",
+      "target": "kfetch",
+      "label": "modifies"
+    },
+    {
+      "source": "t17",
+      "target": "fgeneric",
+      "label": "shows"
+    },
+    {
+      "source": "t18",
+      "target": "fgeneric",
+      "label": "shows"
+    },
+    {
+      "source": "t19",
+      "target": "ftest",
+      "label": "shows"
+    },
+    {
+      "source": "t15",
+      "target": "W0",
+      "label": "fails via"
+    },
+    {
+      "source": "t11",
+      "target": "t20",
+      "label": "+ F2"
+    },
+    {
+      "source": "t20",
+      "target": "WA",
+      "label": "fails via"
+    },
+    {
+      "source": "t20",
+      "target": "kreqid",
+      "label": "fixed decoy"
+    },
+    {
+      "source": "t20",
+      "target": "kf2",
+      "label": "missed"
+    },
+    {
+      "source": "t20",
+      "target": "WC",
+      "label": "fails via"
+    },
+    {
+      "source": "t21",
+      "target": "WA",
+      "label": "fails via"
+    },
+    {
+      "source": "t21",
+      "target": "W0",
+      "label": "fails via"
+    },
+    {
+      "source": "t22",
+      "target": "t23",
+      "label": "bug at all 3 sites"
+    },
+    {
+      "source": "t23",
+      "target": "WA",
+      "label": "fails via"
+    },
+    {
+      "source": "t22",
+      "target": "WA",
+      "label": "control"
+    },
+    {
+      "source": "t24a",
+      "target": "t24b",
+      "label": "+ 5 other flaws"
+    },
+    {
+      "source": "t24b",
+      "target": "WB",
+      "label": "fails via"
+    },
+    {
+      "source": "t26a",
+      "target": "t26b",
+      "label": "+ deadlock"
+    },
+    {
+      "source": "t26b",
+      "target": "WB",
+      "label": "fails via"
+    },
+    {
+      "source": "W0",
+      "target": "d1",
+      "label": "informs"
+    },
+    {
+      "source": "W0",
+      "target": "d2",
+      "label": "informs"
+    },
+    {
+      "source": "WC",
+      "target": "d3",
+      "label": "informs"
+    },
+    {
+      "source": "WA",
+      "target": "d4",
+      "label": "informs"
+    },
+    {
+      "source": "dnext",
+      "target": "W0",
+      "label": "aims to reproduce"
+    },
+    {
+      "source": "dsafe",
+      "target": "mtests",
+      "label": "governs"
+    },
+    {
+      "source": "mharness",
+      "target": "ds",
+      "label": "runs"
+    },
+    {
+      "source": "mreport",
+      "target": "mharness",
+      "label": "given via"
+    },
+    {
+      "source": "mreport",
+      "target": "c3",
+      "label": "enables"
+    },
+    {
+      "source": "mtests",
+      "target": "mscore",
+      "label": "feeds"
+    },
+    {
+      "source": "mscore",
+      "target": "t9",
+      "label": "pass@3 = 0 met"
+    },
+    {
+      "source": "mrepro",
+      "target": "t9",
+      "label": "packages"
+    },
+    {
+      "source": "ds",
+      "target": "WS",
+      "label": "exhibits"
+    },
+    {
+      "source": "mB",
+      "target": "WK",
+      "label": "exhibits"
+    },
+    {
+      "source": "ds",
+      "target": "WX",
+      "label": "shows"
+    },
+    {
+      "source": "mB",
+      "target": "WX",
+      "label": "shows"
+    },
+    {
+      "source": "WS",
+      "target": "cs",
+      "label": "triggers when"
+    },
+    {
+      "source": "WK",
+      "target": "ck",
+      "label": "triggers when"
+    },
+    {
+      "source": "WX",
+      "target": "cx",
+      "label": "holds when"
+    },
+    {
+      "source": "fdrv",
+      "target": "WS",
+      "label": "evidence for"
+    },
+    {
+      "source": "finj",
+      "target": "WS",
+      "label": "evidence for"
+    },
+    {
+      "source": "fstk",
+      "target": "WK",
+      "label": "evidence for"
+    },
+    {
+      "source": "fsgl",
+      "target": "WX",
+      "label": "evidence for"
+    },
+    {
+      "source": "t1",
+      "target": "fsgl",
+      "label": "counted in"
+    },
+    {
+      "source": "WS",
+      "target": "s2",
+      "label": "contradicts"
+    },
+    {
+      "source": "t23",
+      "target": "WS",
+      "label": "also fits"
+    },
+    {
+      "source": "WK",
+      "target": "WB",
+      "label": "similar shape to"
+    },
+    {
+      "source": "WS",
+      "target": "mkb",
+      "label": "recorded in"
+    },
+    {
+      "source": "WK",
+      "target": "mkb",
+      "label": "recorded in"
+    },
+    {
+      "source": "WX",
+      "target": "mkb",
+      "label": "recorded in"
+    },
+    {
+      "source": "mkb",
+      "target": "mmine",
+      "label": "feeds"
+    },
+    {
+      "source": "dgap",
+      "target": "mkb",
+      "label": "missing from"
+    },
+    {
+      "source": "dgap",
+      "target": "W0",
+      "label": "should add"
+    },
+    {
+      "source": "dnext",
+      "target": "dgap",
+      "label": "would prove"
+    }
+  ]
+}

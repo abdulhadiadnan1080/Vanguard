@@ -1,0 +1,28 @@
+{
+ "_about": "Which real model is Model A, Model B, ... The first model is the reference model.",
+ "agent_timeout_multiplier": 1000.0,
+ "models": [
+  {
+   "id": "MODEL_A",
+   "label": "Model A",
+   "match": [
+    "substring-of-model-a"
+   ],
+   "aliases": [],
+   "harbor_model": "provider/model-a",
+   "env_file": "../../../your_pipeline/config/model_a.env",
+   "kwargs": []
+  },
+  {
+   "id": "MODEL_B",
+   "label": "Model B",
+   "match": [
+    "substring-of-model-b"
+   ],
+   "aliases": [],
+   "harbor_model": "provider/model-b",
+   "env_file": "../../../your_pipeline/config/model_b.env",
+   "kwargs": []
+  }
+ ]
+}
