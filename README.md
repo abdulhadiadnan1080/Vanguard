@@ -11,6 +11,11 @@
 [![Tests: 25 passing](https://img.shields.io/badge/tests-25%20passing-2ea44f?style=flat-square)](#tested-end-to-end)
 [![Ranking cost: $0](https://img.shields.io/badge/ranking%20cost-%240-6f42c1?style=flat-square)](#what-it-does)
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/loop-animation-dark.svg">
+  <img alt="How Vanguard works: consult the knowledge graph, rank advisories, narrow down, build the task, approve, validate, run the models, learn, and repeat" src="docs/assets/loop-animation-light.svg" width="100%">
+</picture>
+
 [**Explore the interactive knowledge graph →**](https://abdulhadiadnan1080.github.io/Vanguard/)
 
 <a href="https://abdulhadiadnan1080.github.io/Vanguard/">
