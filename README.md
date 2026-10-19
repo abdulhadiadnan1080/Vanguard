@@ -11,9 +11,9 @@
 [![Tests: 25 passing](https://img.shields.io/badge/tests-25%20passing-2ea44f?style=flat-square)](#tested-end-to-end)
 [![Ranking cost: $0](https://img.shields.io/badge/ranking%20cost-%240-6f42c1?style=flat-square)](#what-it-does)
 
-[**Explore the interactive knowledge graph →**](https://YOUR-USERNAME.github.io/YOUR-REPO/)
+[**Explore the interactive knowledge graph →**](https://abdulhadiadnan1080.github.io/Vanguard/)
 
-<a href="https://YOUR-USERNAME.github.io/YOUR-REPO/">
+<a href="https://abdulhadiadnan1080.github.io/Vanguard/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/graph-overview-dark.png">
   <img alt="The knowledge graph: weaknesses, trigger conditions, evidence, tasks and task-design implications, linked by how they relate" src="docs/assets/graph-overview-light.png" width="100%">
