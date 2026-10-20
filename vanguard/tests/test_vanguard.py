@@ -13,6 +13,11 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 os.environ["VANGUARD_MODELS"] = os.path.join(HERE, "fixtures", "models.json")  # made-up models, before importing sources
+_PRIVATE = tempfile.mkdtemp(prefix="vanguard-test-private-")  # never the developer's own settings or data
+with open(os.path.join(_PRIVATE, "paths.json"), "w") as _f:
+    json.dump({"task_namespace": "tasks"}, _f)
+os.environ["VANGUARD_PRIVATE"] = _PRIVATE
+os.environ["VANGUARD_DATA"] = os.path.join(_PRIVATE, "data")
 
 import ingest  # noqa: E402
 import learner  # noqa: E402
@@ -121,12 +126,12 @@ class TestResultParsing(TempDirTest):
         a, b = os.path.join(self.tmp, "a"), os.path.join(self.tmp, "b")
         write_trial(a, "job", "x", id="same-id")
         write_trial(b, "job-copy", "x", id="same-id")
-        old = sources.JOB_DIRS
-        sources.JOB_DIRS = [a, b]
+        old = sources.settings()["JOB_DIRS"]
+        sources.settings()["JOB_DIRS"] = [a, b]
         try:
             self.assertEqual(len(list(sources.all_trials())), 1)
         finally:
-            sources.JOB_DIRS = old
+            sources.settings()["JOB_DIRS"] = old
 
 
 # ---------------------------------------------------------------- which trials count

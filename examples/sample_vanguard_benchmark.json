@@ -1,0 +1,516 @@
+{
+  "_about": "Sample output of `python3 vanguard/demo.py`: the real pipeline run on SYNTHETIC data (fictional repositories and advisories, stand-in build agent and harness). Field names and structure match a real run; the values are illustrative.",
+  "generated_at": "2026-10-19T23:32:25+00:00",
+  "models": [
+    {
+      "id": "MODEL_A",
+      "label": "Model A"
+    },
+    {
+      "id": "MODEL_B",
+      "label": "Model B"
+    }
+  ],
+  "knowledge_graph": {
+    "nodes_by_type": {
+      "Candidate": 100,
+      "Model": 2,
+      "Signal": 9,
+      "Task": 63,
+      "Trial": 317,
+      "Weakness": 4
+    },
+    "edges_by_relation": {
+      "BUILT_FROM": 61,
+      "BY": 252,
+      "DEFEATS": 134,
+      "HAS_SIGNAL": 192,
+      "ON": 252,
+      "PROBES": 2,
+      "VALIDATES": 65
+    },
+    "what_defeats_which_model": [
+      {
+        "signal_or_weakness": "finder:upstream_tests",
+        "model": "Model B",
+        "tasks_failed": 8,
+        "tasks": 41,
+        "runs_failed": 21,
+        "runs": 85
+      },
+      {
+        "signal_or_weakness": "finder:upstream_tests",
+        "model": "Model A",
+        "tasks_failed": 4,
+        "tasks": 41,
+        "runs_failed": 17,
+        "runs": 80
+      },
+      {
+        "signal_or_weakness": "finder:field_propagation",
+        "model": "Model B",
+        "tasks_failed": 15,
+        "tasks": 27,
+        "runs_failed": 39,
+        "runs": 60
+      },
+      {
+        "signal_or_weakness": "finder:field_propagation",
+        "model": "Model A",
+        "tasks_failed": 7,
+        "tasks": 27,
+        "runs_failed": 26,
+        "runs": 54
+      },
+      {
+        "signal_or_weakness": "finder:cross_package",
+        "model": "Model B",
+        "tasks_failed": 11,
+        "tasks": 19,
+        "runs_failed": 28,
+        "runs": 43
+      },
+      {
+        "signal_or_weakness": "finder:cross_package",
+        "model": "Model A",
+        "tasks_failed": 4,
+        "tasks": 19,
+        "runs_failed": 18,
+        "runs": 40
+      },
+      {
+        "signal_or_weakness": "finder:producer_drops_field",
+        "model": "Model B",
+        "tasks_failed": 13,
+        "tasks": 18,
+        "runs_failed": 32,
+        "runs": 40
+      },
+      {
+        "signal_or_weakness": "finder:producer_drops_field",
+        "model": "Model A",
+        "tasks_failed": 6,
+        "tasks": 18,
+        "runs_failed": 20,
+        "runs": 37
+      }
+    ]
+  },
+  "predictor": {
+    "version": "20261019-1932",
+    "labelled_tasks": 61,
+    "held_out_brier": {
+      "base_rate": 0.155,
+      "prior_only": 0.0646,
+      "fitted": 0.0482
+    },
+    "weights": {
+      "finder:check_calls_producer": -2.327,
+      "bias": -2.213,
+      "weakness:producer-boundary": 2.0,
+      "finder:storage_boundary": 1.936,
+      "finder:producer_drops_field": 1.724,
+      "mitigation:report-hint": -1.5,
+      "mitigation:visible-failing-test": -1.5,
+      "finder:field_propagation": 1.365
+    }
+  },
+  "shortlist": [
+    {
+      "ghsa_id": "GHSA-demo-0016",
+      "repo": "example-org/auth-gateway-16",
+      "p_fail": {
+        "MODEL_A": 0.937,
+        "MODEL_B": 0.971
+      },
+      "p_both": 0.91,
+      "why": [
+        [
+          "finder:storage_boundary",
+          1.88
+        ],
+        [
+          "finder:producer_drops_field",
+          1.7
+        ],
+        [
+          "finder:field_propagation",
+          1.35
+        ]
+      ],
+      "signals": [
+        "finder:field_propagation",
+        "finder:producer_drops_field",
+        "finder:storage_boundary"
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-demo-0029",
+      "repo": "example-org/doc-store-29",
+      "p_fail": {
+        "MODEL_A": 0.937,
+        "MODEL_B": 0.971
+      },
+      "p_both": 0.91,
+      "why": [
+        [
+          "finder:storage_boundary",
+          1.88
+        ],
+        [
+          "finder:producer_drops_field",
+          1.7
+        ],
+        [
+          "finder:field_propagation",
+          1.35
+        ]
+      ],
+      "signals": [
+        "finder:field_propagation",
+        "finder:producer_drops_field",
+        "finder:storage_boundary"
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-demo-0006",
+      "repo": "example-org/config-hub-06",
+      "p_fail": {
+        "MODEL_A": 0.829,
+        "MODEL_B": 0.916
+      },
+      "p_both": 0.759,
+      "why": [
+        [
+          "finder:storage_boundary",
+          1.88
+        ],
+        [
+          "finder:producer_drops_field",
+          1.7
+        ],
+        [
+          "finder:field_propagation",
+          1.35
+        ],
+        [
+          "finder:upstream_tests",
+          -1.12
+        ]
+      ],
+      "signals": [
+        "finder:field_propagation",
+        "finder:producer_drops_field",
+        "finder:storage_boundary",
+        "finder:upstream_tests"
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-demo-0001",
+      "repo": "example-org/chat-server-01",
+      "p_fail": {
+        "MODEL_A": 0.8,
+        "MODEL_B": 0.899
+      },
+      "p_both": 0.719,
+      "why": [
+        [
+          "finder:storage_boundary",
+          1.88
+        ],
+        [
+          "finder:producer_drops_field",
+          1.7
+        ],
+        [
+          "finder:field_propagation",
+          1.35
+        ],
+        [
+          "finder:upstream_tests",
+          -1.12
+        ]
+      ],
+      "signals": [
+        "finder:cross_package",
+        "finder:field_propagation",
+        "finder:producer_drops_field",
+        "finder:storage_boundary",
+        "finder:upstream_tests"
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-demo-0039",
+      "repo": "example-org/media-pipeline-39",
+      "p_fail": {
+        "MODEL_A": 0.693,
+        "MODEL_B": 0.835
+      },
+      "p_both": 0.579,
+      "why": [
+        [
+          "finder:producer_drops_field",
+          1.7
+        ],
+        [
+          "finder:field_propagation",
+          1.35
+        ]
+      ],
+      "signals": [
+        "finder:field_propagation",
+        "finder:producer_drops_field"
+      ]
+    }
+  ],
+  "benchmark_task": {
+    "id": "auth-gateway-16-demo-0016",
+    "built_from": "GHSA-demo-0016",
+    "files": [
+      "environment/Dockerfile",
+      "instruction.md",
+      "solution/fix.patch",
+      "solution/solve.sh",
+      "solution/variants/check_only.patch",
+      "solution/variants/producer_only.patch",
+      "task.toml",
+      "tests/test.sh"
+    ],
+    "validation": {
+      "at": "2026-10-19T19:32:24",
+      "checks": [
+        {
+          "detail": "all required files present",
+          "id": "layout",
+          "name": "Task layout",
+          "status": "pass"
+        },
+        {
+          "detail": "network_mode = \"no-network\"",
+          "id": "offline",
+          "name": "No network in the task container",
+          "status": "pass"
+        },
+        {
+          "detail": "fix_commit 0123456789ab",
+          "id": "metadata",
+          "name": "Advisory metadata",
+          "status": "pass"
+        },
+        {
+          "detail": "clean",
+          "id": "leak_report",
+          "name": "Report does not name the advisory or fix",
+          "status": "pass"
+        },
+        {
+          "detail": "clean",
+          "id": "impact_only",
+          "name": "Report is impact-only (names no fixed file)",
+          "status": "pass"
+        },
+        {
+          "detail": "history removed or never copied",
+          "id": "leak_git",
+          "name": "No upstream git history in the image",
+          "status": "pass"
+        },
+        {
+          "detail": "clean",
+          "id": "leak_tests",
+          "name": "Hidden tests and the fix are not in the image",
+          "status": "pass"
+        },
+        {
+          "detail": "clean (0 shipped file(s) checked)",
+          "id": "leak_env",
+          "name": "Files copied into the image do not name the advisory",
+          "status": "pass"
+        },
+        {
+          "detail": "tests/test.sh writes the reward",
+          "id": "reward",
+          "name": "Verifier writes a reward",
+          "status": "pass"
+        },
+        {
+          "detail": "reviewer: run the repo suite on both trees (VALIDATION.md check 7)",
+          "id": "repo_tests",
+          "name": "Repo's own tests pass on the vulnerable and fixed tree",
+          "reviewed": {
+            "by": "demo-reviewer",
+            "note": "demo reviewer",
+            "state": "pass"
+          },
+          "status": "pass"
+        },
+        {
+          "detail": "reviewer: fairness map (VALIDATION.md check 9)",
+          "id": "fairness",
+          "name": "Every hidden test maps to a sentence of the report",
+          "reviewed": {
+            "by": "demo-reviewer",
+            "note": "demo reviewer",
+            "state": "pass"
+          },
+          "status": "pass"
+        },
+        {
+          "detail": "rewards [1.0, 1.0] (need 1.0 x2)",
+          "id": "oracle",
+          "job": "val-20261019-193224-auth-gateway-16-demo-0016-oracle",
+          "name": "Correct fix scores 1.0 twice",
+          "status": "pass"
+        },
+        {
+          "detail": "reward [0.0], functional tests all pass",
+          "id": "nop",
+          "job": "val-20261019-193224-auth-gateway-16-demo-0016-nop",
+          "name": "No fix scores 0.0, functional tests pass",
+          "status": "pass"
+        },
+        {
+          "detail": "rewards [0.6] (need strictly between 0 and 1)",
+          "id": "variant:check_only",
+          "job": "val-20261019-193224-auth-gateway-16-demo-0016-check-only",
+          "name": "check_only fix (partial)",
+          "status": "pass"
+        },
+        {
+          "detail": "rewards [0.6] (need strictly between 0 and 1)",
+          "id": "variant:producer_only",
+          "job": "val-20261019-193224-auth-gateway-16-demo-0016-producer-only",
+          "name": "producer_only fix (partial)",
+          "status": "pass"
+        }
+      ],
+      "reviewed_at": "2026-10-19T19:32:24",
+      "status": "pass"
+    },
+    "rounds": [
+      {
+        "MODEL_A": [
+          0.64
+        ],
+        "MODEL_B": [
+          0.5
+        ]
+      },
+      {
+        "MODEL_A": [
+          0.64,
+          0.64
+        ],
+        "MODEL_B": [
+          0.5,
+          0.5
+        ]
+      }
+    ],
+    "verdict": "accepted"
+  },
+  "loop_history": {
+    "GHSA-demo-0016": [
+      {
+        "state": "selected",
+        "note": "P(fail) Model A 0.94, Model B 0.97"
+      },
+      {
+        "state": "awaiting-build",
+        "note": "package ready: <demo-folder>/data/loop/GHSA-demo-0016"
+      },
+      {
+        "state": "building",
+        "note": "builder started"
+      },
+      {
+        "state": "awaiting-approval",
+        "note": "built: approve with `vanguard.py approve GHSA-demo-0016`"
+      },
+      {
+        "state": "approved",
+        "note": "approved by demo-reviewer"
+      },
+      {
+        "state": "awaiting-review",
+        "note": "validation needs-review"
+      },
+      {
+        "state": "ready-to-run",
+        "note": "review complete"
+      },
+      {
+        "state": "round1-running",
+        "note": "Model A x1 + Model B x1"
+      },
+      {
+        "state": "awaiting-more-runs",
+        "note": "both failed round 1 (Model A [0.64], Model B [0.5]): approve 2 more each with `vanguard.py approve GHSA-demo-0016 --more-runs`"
+      },
+      {
+        "state": "round2-approved",
+        "note": "approved by demo-reviewer"
+      },
+      {
+        "state": "round2-running",
+        "note": "Model A x2 + Model B x2"
+      },
+      {
+        "state": "accepted",
+        "note": "failed by both models on every attempt"
+      }
+    ],
+    "GHSA-demo-0029": [
+      {
+        "state": "selected",
+        "note": "P(fail) Model A 0.94, Model B 0.97"
+      },
+      {
+        "state": "awaiting-build",
+        "note": "package ready: <demo-folder>/data/loop/GHSA-demo-0029"
+      },
+      {
+        "state": "building",
+        "note": "builder started"
+      },
+      {
+        "state": "rejected",
+        "note": "REJECT: stub: the check calls the producer directly"
+      }
+    ]
+  },
+  "forecast_checks": [
+    {
+      "task": "auth-gateway-16-demo-0016",
+      "model": "Model A",
+      "p_fail": 0.937,
+      "fails": 1,
+      "runs": 1,
+      "brier": 0.004
+    },
+    {
+      "task": "auth-gateway-16-demo-0016",
+      "model": "Model B",
+      "p_fail": 0.971,
+      "fails": 1,
+      "runs": 1,
+      "brier": 0.0008
+    },
+    {
+      "task": "auth-gateway-16-demo-0016",
+      "model": "Model A",
+      "p_fail": 0.937,
+      "fails": 3,
+      "runs": 3,
+      "brier": 0.004
+    },
+    {
+      "task": "auth-gateway-16-demo-0016",
+      "model": "Model B",
+      "p_fail": 0.971,
+      "fails": 3,
+      "runs": 3,
+      "brier": 0.0008
+    }
+  ]
+}

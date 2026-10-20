@@ -1,28 +1,34 @@
-"""Readers for the data the earlier pipeline already produced. Read-only: nothing here writes outside vanguard/.
-
-Reuses the existing analysis code instead of copying it:
-  <finder>/finder.py             -> size_decision, signature, WEIGHTS (the producer/check shape)
-  <pipeline>/01_mine/miner_v2.py -> analyse_patch, weakness_factors (detect rules in weaknesses.json)
+"""Readers for the project's data, and the settings that say where it lives. Nothing here writes outside the data
+folder, and importing this module never reads settings or exits: settings load on first use.
 
 Everything that names a real model or a local folder comes from private/ (templates in private.example/):
-  private/paths.json      where the pipeline and finder folders are
+  private/paths.json      optional folders of an existing pipeline (task folders, Harbor jobs, caches)
   private/models.json     which real model is Model A, Model B, ... and how Harbor runs it
-  private/task_tags.json  which local task tests which weakness
+  private/task_tags.json  which local task tests which weakness (optional)
 Both private/ and the generated data/ may sit in a vanguard_local/ folder next to the repository instead (see
 _pick below). VANGUARD_MODELS points at another models file (the tests use one).
+
+Patch analysis is harvester.py, in this repository.
 """
 import glob
-import importlib.util
 import json
 import os
 import re
-import sys
+from typing import Any, Dict, Iterator, List, Optional
+
+from schemas import Analysis, Trial
+
+import harvester
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Private settings and generated data can live outside the repository, so an upload can never include them:
 # first an explicit VANGUARD_PRIVATE / VANGUARD_DATA, then private/ and data/ inside the repo, then a folder named
 # vanguard_local/ next to the repository (VANGUARD_LOCAL moves it).
 LOCAL = os.environ.get("VANGUARD_LOCAL") or os.path.normpath(os.path.join(HERE, "..", "..", "vanguard_local"))
+
+
+class ConfigError(Exception):
+    """Settings are missing or unusable. The command line prints the message; library callers can catch it."""
 
 
 def _pick(env, name):
@@ -33,66 +39,92 @@ def _pick(env, name):
 
 
 PRIVATE = _pick("VANGUARD_PRIVATE", "private")
+DATA = _pick("VANGUARD_DATA", "data")
+VANGUARD_JOBS = os.path.join(DATA, "harbor_jobs")  # where vanguard's own Harbor runs (validation, the loop) go
+LOOP_TASKS = os.path.join(DATA, "loop_tasks")  # tasks built by the loop's agents
+CATALOG = os.path.join(HERE, "catalog.json")
+TASK_TAGS = os.path.join(PRIVATE, "task_tags.json")
+REPO_WEAKNESSES = os.path.normpath(os.path.join(HERE, "..", "findings", "weaknesses", "weaknesses.json"))
+ANALYSIS_LANG = {"typescript": "javascript"}  # the harvester treats .ts files under "javascript"
 
 
 def _private(name, env=None):
     path = os.environ.get(env) if env and os.environ.get(env) else os.path.join(PRIVATE, name)
     if not os.path.exists(path):
-        sys.exit("vanguard: missing %s. Copy private.example/%s to private/%s and fill it in." % (path, name, name))
-    with open(path, encoding="utf-8") as f:
-        return json.load(f), os.path.dirname(os.path.abspath(path))
-
-
-_paths, _pbase = _private("paths.json")
-_resolve = lambda p: os.path.normpath(os.path.join(_pbase, p))
-PIPELINE = _resolve(_paths["pipeline"])
-FINDER_DIR = _resolve(_paths["finder"])
-ROOT = os.path.commonpath([PIPELINE, FINDER_DIR, HERE])
-TASK_NAMESPACE = _paths.get("task_namespace", "tasks")  # Harbor task names are "<namespace>/<slug>"
-
-_models, _mbase = _private("models.json", "VANGUARD_MODELS")
-MODELS = _models["models"]                       # ordered; the first is the reference model
-MODEL_IDS = [m["id"] for m in MODELS]
-BASE_MODEL = MODEL_IDS[0]
-AGENT_TIMEOUT_MULTIPLIER = float(_models.get("agent_timeout_multiplier", 1000.0))
-for _m in MODELS:
-    if _m.get("env_file"):
-        _m["env_file"] = os.path.normpath(os.path.join(_mbase, _m["env_file"]))
-
-
-def label(model_id):
-    """'MODEL_A' or 'model:MODEL_A' -> 'Model A'."""
-    mid = (model_id or "").split(":")[-1]
-    return next((m["label"] for m in MODELS if m["id"] == mid), mid)
+        raise ConfigError("missing %s. Copy private.example/%s to private/%s and fill it in (or run "
+                          "`python3 main.py --demo`, which needs no settings)." % (path, name, name))
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f), os.path.dirname(os.path.abspath(path))
+    except ValueError as e:
+        raise ConfigError("%s is not valid JSON: %s" % (path, e)) from e
 
 
 def _extra(var):  # extra folders, os.pathsep-separated, e.g. where the loop builds tasks or writes Harbor jobs
     return [p for p in os.environ.get(var, "").split(os.pathsep) if p]
 
 
-DATA = _pick("VANGUARD_DATA", "data")
-VANGUARD_JOBS = os.path.join(DATA, "harbor_jobs")  # where vanguard's own Harbor runs (validation, the loop) go
-LOOP_TASKS = os.path.join(DATA, "loop_tasks")  # tasks built by the loop's agents
-TASK_DIRS = [os.path.join(PIPELINE, "03_build", "tasks"), LOOP_TASKS] + _extra("VANGUARD_TASK_DIRS")
-JOB_DIRS = [os.path.join(PIPELINE, "data", "harbor_jobs")] + [_resolve(p) for p in _paths.get("extra_job_dirs", [])] + \
-    [VANGUARD_JOBS] + _extra("VANGUARD_JOB_DIRS")
-PATCH_CACHES = [os.path.join(FINDER_DIR, "output", "patch_cache"), os.path.join(PIPELINE, "data", "mined", "patch_cache")]
-POOL = os.path.join(FINDER_DIR, "output", "pool.jsonl")
-WEAKNESS_FILE = os.path.join(PIPELINE, "knowledge_base", "weaknesses", "weaknesses.json")
-KNOWN_CASES = os.path.join(FINDER_DIR, "examples", "known_cases.json")
-KB_DB = os.path.join(PIPELINE, "knowledge_base", "kb.sqlite")
-CATALOG = os.path.join(HERE, "catalog.json")
-TASK_TAGS = os.path.join(PRIVATE, "task_tags.json")
-
-ANALYSIS_LANG = {"typescript": "javascript"}  # the finder and miner treat .ts files under "javascript"
+_SETTINGS = None
 
 
-def model_id(name):
+def settings() -> Dict[str, Any]:
+    """All settings-dependent values, loaded once on first use."""
+    global _SETTINGS
+    if _SETTINGS is not None:
+        return _SETTINGS
+    paths, pbase = _private("paths.json")
+    resolve = lambda p: os.path.normpath(os.path.join(pbase, p)) if p else None
+    pipeline, finder_dir = resolve(paths.get("pipeline")), resolve(paths.get("finder"))
+    models_doc, mbase = _private("models.json", "VANGUARD_MODELS")
+    models = models_doc.get("models") or []
+    if not models:
+        raise ConfigError("models.json lists no models")
+    for m in models:
+        if m.get("env_file"):
+            m["env_file"] = os.path.normpath(os.path.join(mbase, m["env_file"]))
+    under = lambda base, *parts: os.path.join(base, *parts) if base else None
+    own_pool, finder_pool = os.path.join(DATA, "pool.jsonl"), under(finder_dir, "output", "pool.jsonl")
+    pipeline_weaknesses = under(pipeline, "knowledge_base", "weaknesses", "weaknesses.json")
+    _SETTINGS = {
+        "PIPELINE": pipeline, "FINDER_DIR": finder_dir,
+        "ROOT": os.path.commonpath([p for p in (pipeline, finder_dir, HERE) if p]),
+        "TASK_NAMESPACE": paths.get("task_namespace", "tasks"),  # Harbor task names are "<namespace>/<slug>"
+        "MODELS": models, "MODEL_IDS": [m["id"] for m in models], "BASE_MODEL": models[0]["id"],
+        "AGENT_TIMEOUT_MULTIPLIER": float(models_doc.get("agent_timeout_multiplier", 1000.0)),
+        "TASK_DIRS": [p for p in [under(pipeline, "03_build", "tasks"), LOOP_TASKS] if p] + _extra("VANGUARD_TASK_DIRS"),
+        "JOB_DIRS": [p for p in [under(pipeline, "data", "harbor_jobs")] if p] +
+                    [resolve(p) for p in paths.get("extra_job_dirs", [])] + [VANGUARD_JOBS] + _extra("VANGUARD_JOB_DIRS"),
+        "PATCH_CACHES": [p for p in [os.path.join(DATA, "patch_cache"), under(finder_dir, "output", "patch_cache"),
+                                     under(pipeline, "data", "mined", "patch_cache")] if p],
+        # the pool `vanguard.py harvest` writes, else an existing finder's pool
+        "POOL": own_pool if os.path.exists(own_pool) or not (finder_pool and os.path.exists(finder_pool)) else finder_pool,
+        "WEAKNESS_FILE": pipeline_weaknesses if pipeline_weaknesses and os.path.exists(pipeline_weaknesses) else REPO_WEAKNESSES,
+        "KNOWN_CASES": under(finder_dir, "examples", "known_cases.json") or "",
+        "KB_DB": under(pipeline, "knowledge_base", "kb.sqlite") or "",
+    }
+    return _SETTINGS
+
+
+def __getattr__(name):  # PEP 562: sources.MODELS, sources.POOL, ... resolve through settings() on first use
+    if name.isupper():
+        s = settings()
+        if name in s:
+            return s[name]
+    raise AttributeError("module 'sources' has no attribute %r" % name)
+
+
+def label(model_id):
+    """'MODEL_A' or 'model:MODEL_A' -> 'Model A'."""
+    mid = (model_id or "").split(":")[-1]
+    return next((m["label"] for m in settings()["MODELS"] if m["id"] == mid), mid)
+
+
+def model_id(name: Optional[str]) -> Optional[str]:
     """A Harbor model name or an old label from earlier data -> the neutral id (MODEL_A, ...)."""
     if not name:
         return None
     low = name.lower()
-    for m in MODELS:
+    for m in settings()["MODELS"]:
         if low == m.get("harbor_model", "").lower() or name in m.get("aliases", []) or name == m["id"] or \
                 any(k in low for k in m.get("match", [])):
             return m["id"]
@@ -100,65 +132,44 @@ def model_id(name):
 
 
 def load_json(path, default=None):
-    if not os.path.exists(path):
+    if not path or not os.path.exists(path):
         return default
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
 def load_jsonl(path):
-    if not os.path.exists(path):
+    if not path or not os.path.exists(path):
         return []
     with open(path, encoding="utf-8") as f:
         return [json.loads(l) for l in f if l.strip()]
 
 
-# ---------------------------------------------------------------- reused analysis modules
-_modules = {}
-
-
-def _load(name, path):
-    if name not in _modules:
-        spec = importlib.util.spec_from_file_location(name, path)
-        mod = importlib.util.module_from_spec(spec)
-        sys.modules[name] = mod
-        spec.loader.exec_module(mod)
-        _modules[name] = mod
-    return _modules[name]
-
-
-def finder():
-    return _load("vg_finder", os.path.join(FINDER_DIR, "finder.py"))
-
-
-def miner():
-    return _load("vg_miner_v2", os.path.join(PIPELINE, "01_mine", "miner_v2.py"))
-
-
+# ---------------------------------------------------------------- fix patches and their analysis
 def patch_for(repo, sha, fetch=False):
-    """Fix patch from the existing caches; with fetch=True download it through finder.fetch_patch (adds to its cache)."""
+    """Fix patch from the caches; with fetch=True download it from GitHub into data/patch_cache."""
     if not sha:
         return None
-    for cache in PATCH_CACHES:
+    for cache in settings()["PATCH_CACHES"]:
         hits = glob.glob(os.path.join(cache, sha[:40] + "*.patch")) if len(sha) >= 7 else []
         if hits:
             with open(hits[0], encoding="utf-8", errors="replace") as f:
                 return f.read()
     if fetch and repo:
-        return finder().fetch_patch(repo, sha)
+        return harvester.fetch_patch(repo, sha, settings()["PATCH_CACHES"][0])
     return None
 
 
-def analyse(cand, text, weaknesses, repo_advisories=1):
-    """Signals for one advisory's fix patch: [(signal_id, hint_weight, reason)], plus the finder signature and any reject.
+def analyse(cand: dict, text: str, weaknesses: List[dict], repo_advisories: int = 1) -> Analysis:
+    """Signals for one advisory's fix patch: [(signal_id, hint_weight, reason)], plus the signature and any reject.
 
     cand needs: language, summary (and optionally description, cwes)."""
     lang = ANALYSIS_LANG.get(cand.get("language"), cand.get("language"))
     c = dict(cand, language=lang)
     out = {"signals": [], "finder": None, "reject": None, "shape": None}
-    out["reject"] = finder().size_decision(text, lang)
+    out["reject"] = harvester.size_decision(text, lang)
     if not out["reject"]:
-        sig, why = finder().signature(c, text)
+        sig, why = harvester.signature(c, text)
         if sig:
             out["finder"] = {"points": sig["points"], "features": sig["features"]}
             names = {f[0] for f in sig["factors"]}
@@ -168,9 +179,9 @@ def analyse(cand, text, weaknesses, repo_advisories=1):
                 out["signals"].append(("weakness:producer-boundary", None, "finder: producer drops a shared security field across a boundary, check does not call it"))
         else:
             out["reject"] = why
-    shape = miner().analyse_patch(text, lang)
+    shape = harvester.analyse_patch(text, lang)
     out["shape"] = {k: v for k, v in shape.items() if k != "src_paths"}
-    for name, w, reason in miner().weakness_factors(c, shape, repo_advisories, weaknesses):
+    for name, w, reason in harvester.weakness_factors(c, shape, repo_advisories, weaknesses):
         out["signals"].append((name, w, reason))
     return out
 
@@ -198,7 +209,7 @@ def task_metadata(task_dir):
 
 
 def task_dirs():
-    for base in TASK_DIRS:
+    for base in settings()["TASK_DIRS"]:
         for d in sorted(glob.glob(os.path.join(base, "*", ""))):
             if os.path.exists(os.path.join(d, "task.toml")):
                 yield os.path.basename(d.rstrip("/")), d
@@ -244,7 +255,7 @@ def functional_ok(details):
     return None
 
 
-def read_trial(result_path):
+def read_trial(result_path: str) -> Trial:
     with open(result_path, encoding="utf-8") as f:
         r = json.load(f)
     trial_dir = os.path.dirname(result_path)
@@ -276,9 +287,9 @@ def read_trial(result_path):
     }
 
 
-def all_trials():
+def all_trials() -> Iterator[Trial]:
     seen = set()
-    for base in JOB_DIRS:
+    for base in settings()["JOB_DIRS"]:
         for path in sorted(glob.glob(os.path.join(base, "*", "*", "result.json"))):
             try:
                 t = read_trial(path)
@@ -293,15 +304,16 @@ def all_trials():
 def advisory_text():
     """GHSA -> {summary, description, cwes, repo} from the finder pool and the old knowledge base."""
     out = {}
-    if os.path.exists(KB_DB):
+    kb_db = settings()["KB_DB"]
+    if kb_db and os.path.exists(kb_db):
         import sqlite3
-        db = sqlite3.connect("file:%s?mode=ro" % KB_DB, uri=True)
+        db = sqlite3.connect("file:%s?mode=ro" % kb_db, uri=True)
         for g, repo, lang, cwe, summary, sha in db.execute(
                 "SELECT ghsa_id, repo, language, cwe, summary, fix_commit FROM candidates"):
             out[g] = {"repo": repo, "language": lang, "cwes": [c for c in (cwe or "").split(",") if c],
                       "summary": summary or "", "fix_commit": sha}
         db.close()
-    for row in load_jsonl(POOL):
+    for row in load_jsonl(settings()["POOL"]):
         fix = (row.get("fix_commits") or [{}])[0]
         out[row["ghsa_id"]] = dict(out.get(row["ghsa_id"], {}), repo=row.get("repo"), language=row.get("language"),
                                    cwes=row.get("cwes") or [], summary=row.get("summary") or "",

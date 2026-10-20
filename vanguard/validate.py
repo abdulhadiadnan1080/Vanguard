@@ -24,6 +24,9 @@ import os
 import re
 import shutil
 import subprocess
+from typing import Dict, List, Tuple
+
+from schemas import Trial, ValidationCheck, ValidationRecord, Verdict
 
 import sources
 
@@ -37,7 +40,7 @@ def expectation(name):
 
 
 # ---------------------------------------------------------------- static checks
-def static_checks(task_dir):
+def static_checks(task_dir: str) -> List[ValidationCheck]:
     meta = sources.task_metadata(task_dir) or {}
     out = []
 
@@ -190,7 +193,7 @@ def job_trials(name):
     return [sources.read_trial(p) for p in glob.glob(os.path.join(sources.VANGUARD_JOBS, name, "*", "result.json"))]
 
 
-def judge(check, trials):
+def judge(check: dict, trials: List[Trial]) -> Tuple[str, str]:
     if not trials:  # Harbor itself failed (Docker hiccup, image build error): not evidence about the task
         return "infra", "Harbor produced no trial results: see data/harbor_jobs/%s.log, then re-run" % check.get("job", "<job>")
     scored = [t for t in trials if t["reward"] is not None]
@@ -217,7 +220,7 @@ def judge(check, trials):
     return ("pass" if ok else "fail"), why
 
 
-def run_checks(task_dir, use_auto=False, parallel=3, log=print):
+def run_checks(task_dir: str, use_auto: bool = False, parallel: int = 3, log=print) -> List[ValidationCheck]:
     slug = os.path.basename(os.path.normpath(task_dir))
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     checks = [{"id": "oracle", "kind": "oracle", "name": "Correct fix scores 1.0 twice", "path": task_dir, "attempts": 2},
@@ -248,7 +251,7 @@ def run_checks(task_dir, use_auto=False, parallel=3, log=print):
     return [{k: c.get(k) for k in ("id", "name", "status", "detail", "job")} for c in checks] + extra
 
 
-def overall(checks):
+def overall(checks: List[ValidationCheck]) -> Verdict:
     """fail > incomplete (a run crashed or was skipped) > needs-review (a manual item or warning is open) > pass.
     A task is only "pass" when every check passed or a reviewer marked it pass / not applicable."""
     st = [c["status"] for c in checks]
@@ -264,7 +267,7 @@ def overall(checks):
 REVIEW_STATES = ("pass", "fail", "na")
 
 
-def apply_review(record, decisions, note, who):
+def apply_review(record: ValidationRecord, decisions: Dict[str, str], note: str, who: str) -> ValidationRecord:
     """decisions: {check_id: pass|fail|na}. Only manual/warn items can be reviewed; automated results stand."""
     by_id = {c["id"]: c for c in record["checks"]}
     for cid, state in decisions.items():

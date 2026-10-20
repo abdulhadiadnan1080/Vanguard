@@ -32,7 +32,12 @@ class LoopEndToEnd(unittest.TestCase):
         with open(os.path.join(self.tmp, "config.json"), "w") as f:
             json.dump({"builder_cmd": [sys.executable, os.path.join(FIX, "fake_builder.py")],
                        "builder_timeout_min": 2, "max_active": 3}, f)
-        self.env = dict(os.environ, VANGUARD_DATA=self.data, VANGUARD_CONFIG=os.path.join(self.tmp, "config.json"),
+        priv = os.path.join(self.tmp, "private")  # its own settings: never the developer's pipeline or data
+        os.makedirs(priv)
+        with open(os.path.join(priv, "paths.json"), "w") as f:
+            json.dump({"task_namespace": "tasks"}, f)
+        self.env = dict(os.environ, VANGUARD_PRIVATE=priv, VANGUARD_DATA=self.data,
+                        VANGUARD_CONFIG=os.path.join(self.tmp, "config.json"),
                         VANGUARD_HARBOR=os.path.join(FIX, "fake_harbor.py"), VANGUARD_TEST_NO_DOCKER="1",
                         VANGUARD_MODELS=os.path.join(FIX, "models.json"),
                         STUB_REJECT="GHSA-aaaa-0000-0002")

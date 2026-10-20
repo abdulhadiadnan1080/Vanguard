@@ -12,7 +12,7 @@
     "OLD_A"
    ],
    "harbor_model": "vendor-a/model-a",
-   "env_file": "fake.env",
+   "env_file": "placeholder_model_settings.txt",
    "kwargs": []
   },
   {
@@ -25,7 +25,7 @@
     "OLD_B"
    ],
    "harbor_model": "vendor-b/model-b",
-   "env_file": "fake.env",
+   "env_file": "placeholder_model_settings.txt",
    "kwargs": []
   }
  ]

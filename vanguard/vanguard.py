@@ -3,6 +3,7 @@
 
 Commands (none of them runs a model, starts Docker or needs API keys; only --fetch touches the network, for patches):
 
+    python3 vanguard.py harvest           fetch reviewed advisories from GitHub's advisory database into data/pool.jsonl
     python3 vanguard.py ingest            build/refresh the knowledge graph from all past tasks and Harbor trials
     python3 vanguard.py train             fit the predictor on recorded outcomes and score it (leave-one-repo-out)
     python3 vanguard.py rank [--top 25]   score every advisory in the finder pool, write a shortlist
@@ -35,6 +36,7 @@ sys.path.insert(0, HERE)
 
 import ingest as ingest_mod  # noqa: E402
 import learner  # noqa: E402
+import harvester  # noqa: E402
 import sources  # noqa: E402
 import validate as validate_mod  # noqa: E402
 import loop as loop_mod  # noqa: E402
@@ -43,12 +45,37 @@ from knowledge_graph import Graph, parse_ts  # noqa: E402
 DATA = sources.DATA
 GRAPH = os.path.join(DATA, "graph.sqlite")
 MODEL = os.path.join(DATA, "model.json")
-MODELS = tuple(sources.MODEL_IDS)
-BASE = sources.BASE_MODEL
+
+
+def models():
+    return tuple(sources.MODEL_IDS)
+
+
+def base():
+    return sources.BASE_MODEL
 
 
 def stamp():
     return datetime.datetime.now().strftime("%Y%m%d-%H%M")
+
+
+def cmd_harvest(g, args):
+    """Reviewed advisories with a fix commit, from GitHub's public advisory database, merged into data/pool.jsonl."""
+    rows = harvester.harvest(args.ecosystems, args.since, args.pages)
+    path = os.path.join(DATA, "pool.jsonl")
+    pool = {r["ghsa_id"]: r for r in sources.load_jsonl(path)}
+    new = sum(1 for r in rows if r["ghsa_id"] not in pool)
+    pool.update((r["ghsa_id"], r) for r in rows)
+    os.makedirs(DATA, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        for r in sorted(pool.values(), key=lambda r: r.get("published_at") or "", reverse=True):
+            f.write(json.dumps(r, sort_keys=True) + "\n")
+    os.replace(tmp, path)
+    print("harvest: %d advisories with a fix commit (%d new); pool now %d -> %s" % (len(rows), new, len(pool), path))
+    if args.fetch:
+        got = sum(1 for r in rows if sources.patch_for((r["fix_commits"][0] or {}).get("repo"), r["fix_commits"][0]["sha"], fetch=True))
+        print("  fix patches cached: %d of %d" % (got, len(rows)))
 
 
 def cmd_ingest(g, args):
@@ -56,10 +83,21 @@ def cmd_ingest(g, args):
 
 
 def cmd_train(g, args):
+    if not g.nodes("Signal"):
+        ingest_mod.ingest(g, log=lambda *a: None)
     rows = learner.task_rows(g)
-    if not rows:
-        sys.exit("no labelled outcomes in the graph: run `vanguard.py ingest` first")
     prior = learner.priors(g, rows)
+    if not rows:  # nothing run yet: the starting (hand-set) weights are the model until outcomes arrive
+        model = {"version": stamp() + "-prior", "trained_at": datetime.datetime.now().isoformat(timespec="seconds"),
+                 "rows": 0, "labelled_tasks": 0, "weights": learner.prior_weights(prior),
+                 "prior": {k: v[0] for k, v in prior.items()}, "evaluation": None}
+        os.makedirs(DATA, exist_ok=True)
+        with open(MODEL + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(model, f, indent=1, sort_keys=True)
+        os.replace(MODEL + ".tmp", MODEL)
+        print("train: no labelled outcomes yet, so the model is the starting weights (%d signals). Run tasks, then "
+              "`collect`, to start learning." % len(prior))
+        return
     weights = learner.fit(rows, prior)
     ev = learner.evaluate(rows, prior)
     labelled_tasks = len({r["task"] for r in rows})
@@ -74,9 +112,12 @@ def cmd_train(g, args):
     g.metric("train", version=model["version"], rows=len(rows), labelled_tasks=labelled_tasks, **{
         "%s_%s" % (m, k): ev[m][k] for m in ("base_rate", "prior_only", "fitted") for k in ("brier", "logloss")})
     print("train: %d rows from %d labelled tasks (%d repos)" % (len(rows), labelled_tasks, ev["n_groups"]))
-    print("  leave-one-repo-out   Brier   log loss   (lower is better)")
-    for m in ("base_rate", "prior_only", "fitted"):
-        print("  %-18s %7.4f   %7.4f" % (m, ev[m]["brier"], ev[m]["logloss"]))
+    if ev["fitted"]["brier"] is None:  # every repository would have to be held out against nothing
+        print("  held-out accuracy: not measurable yet (needs labelled tasks from at least 2 repositories)")
+    else:
+        print("  leave-one-repo-out   Brier   log loss   (lower is better)")
+        for m in ("base_rate", "prior_only", "fitted"):
+            print("  %-18s %7.4f   %7.4f" % (m, ev[m]["brier"], ev[m]["logloss"]))
     moved = sorted(((weights[f] - prior.get(f, (0, 0))[0], f) for f in weights), key=lambda t: -abs(t[0]))[:6]
     print("  largest moves from the prior: " + ", ".join("%s %+.2f" % (f, d) for d, f in moved if abs(d) >= 0.05))
     print("  saved %s" % os.path.relpath(MODEL, HERE))
@@ -90,13 +131,16 @@ def load_model(g):
 
 
 def cmd_rank(g, args):
+    if not g.nodes("Signal"):
+        ingest_mod.ingest(g, log=lambda *a: None)
     model = load_model(g)
     w = model["weights"]
     catalog_kb = [x for x in (sources.load_json(sources.WEAKNESS_FILE, []) or [])
                   if x.get("status") != "rejected" and x.get("weight")]
-    pool = sources.load_jsonl(args.pool)
+    pool_path = args.pool or sources.POOL
+    pool = sources.load_jsonl(pool_path)
     if not pool:
-        sys.exit("empty pool: %s" % args.pool)
+        sys.exit("rank: no advisories in %s. Fetch some first: `vanguard.py harvest --since 2025-01-01 --pages 3 --fetch`" % pool_path)
     built = {(g.get(e["dst"]) or {}).get("label") for e in g.edges(rel="BUILT_FROM")}
     repo_adv = collections.Counter(r.get("repo") for r in pool)
     out, skipped = [], collections.Counter()
@@ -108,14 +152,14 @@ def cmd_rank(g, args):
             continue
         res = sources.analyse(row, text, catalog_kb, repo_adv.get(row.get("repo"), 1))
         x = {sid: 1.0 for sid, _, _ in res["signals"]}
-        views = {m: learner.for_model(g, x, m) for m in MODELS}
-        p = {m: learner.predict(w, views[m]) for m in MODELS}
+        views = {m: learner.for_model(g, x, m) for m in models()}
+        p = {m: learner.predict(w, views[m]) for m in models()}
         item = {"ghsa_id": row["ghsa_id"], "repo": row.get("repo"), "language": row.get("language"),
                 "summary": (row.get("summary") or "")[:140], "fix_commit": fix.get("sha"),
                 "p_fail": {m: round(v, 3) for m, v in p.items()}, "p_both": round(_product(p.values()), 3),
                 "finder_points": (res["finder"] or {}).get("points"), "reject": res["reject"],
                 "already_built": row["ghsa_id"] in built, "signals": sorted(x),
-                "why": learner.explain(w, views[BASE]), "model_version": model["version"]}
+                "why": learner.explain(w, views[base()]), "model_version": model["version"]}
         out.append(item)
         cid = "cand:" + row["ghsa_id"]
         g.node(cid, "Candidate", row["ghsa_id"], repo=row.get("repo"), language=row.get("language"),
@@ -124,7 +168,7 @@ def cmd_rank(g, args):
                shape=res["shape"])
         for sid, wt, reason in res["signals"]:
             g.edge(cid, "HAS_SIGNAL", sid, weight=wt, reason=reason)
-        for m in MODELS:
+        for m in models():
             g.edge(cid, "PREDICTED", "model:" + m, p_fail=item["p_fail"][m], version=model["version"],
                    at=model["trained_at"])
             g.record_prediction(cid, "model:" + m, item["p_fail"][m], model["version"])
@@ -141,12 +185,12 @@ def cmd_rank(g, args):
         i["evidence_tasks"] = len(labelled.get(i["evidence_signal"], ()))
         i["evidence_repos"] = len(repos.get(i["evidence_signal"], ()))
     eligible, seen_fix = [], set()
-    for i in sorted(out, key=lambda i: (-i["p_both"], -i["p_fail"][BASE])):
+    for i in sorted(out, key=lambda i: (-i["p_both"], -i["p_fail"][base()])):
         if i["already_built"] or _unbuildable(i["reject"]) or i["fix_commit"] in seen_fix:
             continue  # one advisory per fix commit: several GHSAs can share one fix
         seen_fix.add(i["fix_commit"])
         eligible.append(i)
-    other_tasks = min((len({r["task"] for r in rows if r["model"] == "model:" + m}) for m in MODELS[1:]), default=0)
+    other_tasks = min((len({r["task"] for r in rows if r["model"] == "model:" + m}) for m in models()[1:]), default=0)
     s = stamp()
     jsonl = os.path.join(DATA, "rank_%s.jsonl" % s)
     with open(jsonl, "w", encoding="utf-8") as f:
@@ -158,7 +202,7 @@ def cmd_rank(g, args):
     print("rank: scored %d of %d advisories (%s); %d eligible" % (len(out), len(pool), dict(skipped) or "all patches cached", len(eligible)))
     for n, i in enumerate(eligible[:10], 1):
         print("  %2d. %-20s %-34s %s  %s" % (n, i["ghsa_id"], (i["repo"] or "")[:34],
-              "  ".join("%s %.2f" % (sources.label(m)[-1], i["p_fail"][m]) for m in MODELS), ", ".join(f for f, _ in i["why"][:2])))
+              "  ".join("%s %.2f" % (sources.label(m)[-1], i["p_fail"][m]) for m in models()), ", ".join(f for f, _ in i["why"][:2])))
     print("  wrote %s and %s" % (os.path.relpath(md, HERE), os.path.relpath(jsonl, HERE)))
 
 
@@ -175,24 +219,28 @@ def _product(xs):
 
 def shortlist_md(items, model, n_pool, n_scored, n_eligible, skipped, other_tasks):
     ev = model["evaluation"]
+    accuracy = ("Model trained on %d labelled tasks; leave-one-repo-out Brier %.3f (base rate %.3f, hand weights %.3f). "
+                "Treat these as a ranking, not a guarantee." % (model["labelled_tasks"], ev["fitted"]["brier"],
+                                                                 ev["base_rate"]["brier"], ev["prior_only"]["brier"])
+                ) if ev and ev["fitted"]["brier"] is not None else (
+                    "Model trained on %d labelled task(s); held-out accuracy needs tasks from at least 2 repositories."
+                    % model["labelled_tasks"] if ev else
+                    "No labelled outcomes yet: these scores are the starting weights, before any learning.")
     lines = [
         "# Vanguard shortlist (%s)" % model["version"], "",
-        "Predicted chance that each model **fails one attempt** at a task built from the advisory. "
-        "Model trained on %d labelled tasks; leave-one-repo-out Brier %.3f (base rate %.3f, hand weights %.3f). "
-        "Treat these as a ranking, not a guarantee: the model is still small." % (
-            model["labelled_tasks"], ev["fitted"]["brier"], ev["base_rate"]["brier"], ev["prior_only"]["brier"]), "",
+        "Predicted chance that each model **fails one attempt** at a task built from the advisory. " + accuracy, "",
         "**Evidence** is how many labelled tasks, and from how many different repositories, share the candidate's "
         "strongest signal. A high probability backed by one repository is a hypothesis to test, not a finding. The other models have as few as %d labelled task(s), so "
-        "their columns mostly reuse %s evidence." % (other_tasks, sources.label(BASE)), "",
+        "their columns mostly reuse %s evidence." % (other_tasks, sources.label(base())), "",
         "Pool %d · scored %d · eligible %d (not built yet, buildable size, one per fix commit) · skipped %s" % (
             n_pool, n_scored, n_eligible, dict(skipped) or "none"), "",
         "| # | Advisory | Repo | Lang | %s | Evidence | Finder pts | Main reasons |" % " | ".join(
-            "P(%s fails)" % sources.label(m) for m in MODELS),
-        "|---|---|---|---|%s---|---|---|" % ("---|" * len(MODELS))]
+            "P(%s fails)" % sources.label(m) for m in models()),
+        "|---|---|---|---|%s---|---|---|" % ("---|" * len(models()))]
     for n, i in enumerate(items, 1):
         why = "; ".join("%s (%+.1f)" % (f.split(":", 1)[1], c) for f, c in i["why"])
         lines.append("| %d | %s | %s | %s | %s | %d task(s), %d repo(s) | %s | %s |" % (
-            n, i["ghsa_id"], i["repo"], i["language"], " | ".join("%.2f" % i["p_fail"][m] for m in MODELS),
+            n, i["ghsa_id"], i["repo"], i["language"], " | ".join("%.2f" % i["p_fail"][m] for m in models()),
             i["evidence_tasks"], i["evidence_repos"], "" if i["finder_points"] is None else i["finder_points"], why or "no strong signal"))
     return "\n".join(lines) + "\n"
 
@@ -404,16 +452,13 @@ def cmd_doctor(g, args):
         print("  %-4s %-30s %s" % ("ok" if ok else "FAIL", name, detail))
 
     check("python", sys.version_info >= (3, 9), sys.version.split()[0])
-    for label, path in (("finder", os.path.join(sources.FINDER_DIR, "finder.py")),
-                        ("miner", os.path.join(sources.PIPELINE, "01_mine", "miner_v2.py")),
-                        ("weaknesses.json", sources.WEAKNESS_FILE), ("catalog.json", sources.CATALOG),
-                        ("finder pool", sources.POOL)):
-        check(label, os.path.exists(path), os.path.relpath(path, sources.ROOT))
-    try:
-        sources.finder(), sources.miner()
-        check("analysis modules import", True, "finder.py, miner_v2.py")
-    except Exception as e:  # noqa: BLE001
-        check("analysis modules import", False, repr(e)[:100])
+    check("settings", True, sources.PRIVATE)
+    for label, path in (("weaknesses.json", sources.WEAKNESS_FILE), ("catalog.json", sources.CATALOG)):
+        check(label, os.path.exists(path), path)
+    pool = sources.load_jsonl(sources.POOL)
+    check("advisory pool", bool(pool), "%d advisories in %s" % (len(pool), sources.POOL) if pool else
+          "empty: run `vanguard.py harvest --since 2025-01-01 --pages 3`")
+    check("harvester", bool(harvester.WEIGHTS), "%d scoring factors" % len(harvester.WEIGHTS))
     ok = g.db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     nodes, _ = g.counts()
     check("graph integrity", ok, "%s, %d nodes" % (os.path.relpath(GRAPH, HERE), sum(nodes.values())))
@@ -460,9 +505,10 @@ def cmd_report(g, args):
     lines += ["", "## Predictor accuracy over time", "",
               "Leave-one-repo-out. Brier score: 0 is perfect, 0.25 is a coin flip. It should fall as tasks are added.", "",
               "| Trained | Labelled tasks | Base rate | Hand weights | Fitted |", "|---|---|---|---|---|"]
+    fmt = lambda v: "n/a" if v is None else "%.4f" % v
     for h in hist:
-        lines.append("| %s | %d | %.4f | %.4f | %.4f |" % (h["version"], h["labelled_tasks"], h["base_rate_brier"],
-                                                         h["prior_only_brier"], h["fitted_brier"]))
+        lines.append("| %s | %d | %s | %s | %s |" % (h["version"], h["labelled_tasks"], fmt(h["base_rate_brier"]),
+                                                   fmt(h["prior_only_brier"]), fmt(h["fitted_brier"])))
     vals = [(t["label"], t["validation"]) for t in g.nodes("Task") if t.get("validation")]
     lines += ["", "## Validation", ""]
     if vals:
@@ -511,10 +557,15 @@ def cmd_export(g, args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    hv = sub.add_parser("harvest")
+    hv.add_argument("--ecosystems", nargs="+", default=["pip", "npm", "go", "maven", "rubygems", "composer"])
+    hv.add_argument("--since", default="2025-01-01", help="published on or after (YYYY-MM-DD)")
+    hv.add_argument("--pages", type=int, default=3, help="pages of 100 per ecosystem (set GITHUB_TOKEN for more)")
+    hv.add_argument("--fetch", action="store_true", help="also download each fix patch")
     sub.add_parser("ingest")
     sub.add_parser("train")
     r = sub.add_parser("rank")
-    r.add_argument("--pool", default=sources.POOL, help="advisory pool JSONL (default: the finder's pool.jsonl)")
+    r.add_argument("--pool", help="advisory pool JSONL (default: data/pool.jsonl from `harvest`, else an existing finder's pool)")
     r.add_argument("--top", type=int, default=25)
     r.add_argument("--fetch", action="store_true", help="download fix patches that are not cached yet")
     c = sub.add_parser("collect")
@@ -553,9 +604,11 @@ def main():
     args = ap.parse_args()
     g = Graph(GRAPH)
     try:
-        {"ingest": cmd_ingest, "train": cmd_train, "rank": cmd_rank, "collect": cmd_collect, "watch": cmd_watch, "validate": cmd_validate, "review": cmd_review, "doctor": cmd_doctor,
+        {"harvest": cmd_harvest, "ingest": cmd_ingest, "train": cmd_train, "rank": cmd_rank, "collect": cmd_collect, "watch": cmd_watch, "validate": cmd_validate, "review": cmd_review, "doctor": cmd_doctor,
          "loop": cmd_loop, "approve": cmd_approve, "reject": cmd_reject,
          "report": cmd_report, "export": cmd_export}[args.cmd](g, args)
+    except sources.ConfigError as e:  # missing or broken settings: a clear message, not a traceback
+        sys.exit("vanguard: %s" % e)
     finally:
         g.close()
 

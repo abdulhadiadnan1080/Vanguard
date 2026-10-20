@@ -10,8 +10,9 @@ rank advisories ──► triage + build (agent, you approve) ──► validate
       └──────────── train on recorded outcomes ◄──── ingest results into the graph ◄─┘
 ```
 
-Phase 1 (this folder today) is the graph, the learning predictor and the ranking. Python 3.9+ standard library only;
-it reads the earlier pipeline's data in place and never writes outside `vanguard/`.
+Everything in the diagram is implemented: harvesting, ranking, the knowledge graph and learner, validation, and the
+gated loop. Python 3.9+ standard library only. It can also read an existing pipeline's task folders and Harbor runs
+in place (configured in `private/paths.json`); it never writes outside its data folder.
 
 ## Private settings
 
@@ -32,6 +33,7 @@ Adding a third model is one more entry in `models.json`: it gets its own column 
 ## Commands
 
 ```bash
+python3 vanguard.py harvest --since 2025-01-01 --pages 3 --fetch   # real advisories and fix patches from GitHub
 python3 vanguard.py ingest           # build/refresh the graph from all past tasks and Harbor trials (idempotent)
 python3 vanguard.py train            # fit on recorded outcomes, score it leave-one-repo-out, save data/model.json
 python3 vanguard.py rank --top 25    # score the finder's advisory pool, write data/shortlist_<stamp>.md
@@ -58,7 +60,9 @@ Extra folders (for example where the loop builds tasks or writes Harbor jobs) ca
 | File | Role |
 |---|---|
 | `knowledge_graph.py` | SQLite graph store (`data/graph.sqlite`): nodes, typed edges, metrics history |
-| `sources.py` | Readers for task folders, Harbor trials (all 3 `details.json` shapes), the finder pool and the old KB; reuses `finder.py` and `miner_v2.py` analysis |
+| `harvester.py` | GitHub advisory harvest, fix-patch download and cache, size filter, the check / data-producer signature and its scored factors, fix spread, weakness detection rules |
+| `sources.py` | Settings (loaded lazily; missing ones raise `ConfigError`) and readers for task folders, Harbor trials (all 3 `details.json` shapes) and the advisory pool |
+| `schemas.py` | Typed shapes (`TypedDict`) of every record: advisories, analyses, trials, ranked candidates, validation records, loop state, model settings |
 | `ingest.py` | Builds the graph and recomputes outcome edges, deciding which trials count |
 | `learner.py` | Logistic regression with priors set from the hand weights; leave-one-repo-out evaluation |
 | `catalog.json` | Curated knowledge the run data can't supply: the weaknesses and the mitigations (task tags are in `private/`) |

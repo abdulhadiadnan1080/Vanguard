@@ -9,6 +9,7 @@ Which trials count (applied in recompute_outcomes):
 """
 import collections
 
+import harvester
 import sources
 
 SOLVED = 1.0  # a trial solves the task only with every hidden security test passing
@@ -35,7 +36,7 @@ def ingest(g, log=print):
                models=[sources.model_id(x) for x in w.get("models") or []],
                status=w.get("status"), weight=w.get("weight"), detect=w.get("detect"),
                behavioural=w.get("behavioural"), source=w.get("source"))
-    for name, (weight, reason) in sources.finder().WEIGHTS.items():
+    for name, (weight, reason) in harvester.WEIGHTS.items():
         g.node("finder:" + name, "Signal", name, weight=weight, description=reason, source="finder.py WEIGHTS")
     for m in catalog.get("mitigations", []):
         g.node("mitigation:" + m["id"], "Signal", m["id"], weight=m["weight"], description=m["label"], source=m["source"])

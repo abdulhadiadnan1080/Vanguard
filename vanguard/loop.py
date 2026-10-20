@@ -29,6 +29,9 @@ import re
 import shutil
 import subprocess
 import sys
+from typing import List, Optional
+
+from schemas import LoopStage, LoopState, RankedCandidate
 
 import sources
 import validate as validate_mod
@@ -37,8 +40,15 @@ LOOP_DIR = os.path.join(sources.DATA, "loop")            # one package folder pe
 LOOP_TASKS = sources.LOOP_TASKS                         # where builders put finished task folders
 CONFIG = os.environ.get("VANGUARD_CONFIG") or os.path.join(sources.HERE, "config.json")
 LOCK = os.path.join(sources.DATA, "loop.lock")
-PROMPTS = os.path.join(sources.FINDER_DIR, "prompts")
-MODELS = tuple(sources.MODEL_IDS)
+
+
+def models():
+    return tuple(sources.MODEL_IDS)
+
+
+def prompts_dir():
+    """The triage/build prompts and validation checklist of an existing finder, if one is configured."""
+    return os.path.join(sources.FINDER_DIR, "prompts") if sources.FINDER_DIR else None
 END = {"rejected", "dropped", "solved", "accepted"}
 MAX_RETRIES = 2
 
@@ -54,11 +64,11 @@ def load_config():
 
 
 # ---------------------------------------------------------------- state
-def state_of(g, ghsa):
+def state_of(g, ghsa: str) -> Optional[LoopState]:
     return (g.get("cand:" + ghsa) or {}).get("loop")
 
 
-def set_state(g, ghsa, state, log, **extra):
+def set_state(g, ghsa: str, state: LoopStage, log, **extra) -> LoopState:
     st = state_of(g, ghsa) or {"ghsa": ghsa, "history": []}
     st.update(extra)
     if st.get("state") != state:
@@ -107,7 +117,7 @@ def latest_rank():
     return os.path.join(sources.DATA, files[-1]) if files else None
 
 
-def select(g, n, log):
+def select(g, n: int, log) -> List[RankedCandidate]:
     path = latest_rank()
     if not path:
         log("  no rank file: run `vanguard.py rank` first")
@@ -123,12 +133,12 @@ def select(g, n, log):
             continue
         seen_fix.add(row.get("fix_commit"))
         picked.append(row)
-        for m in MODELS:  # freeze the forecast at selection, so every loop task can be scored against it later
+        for m in models():  # freeze the forecast at selection, so every loop task can be scored against it later
             g.record_prediction("cand:" + row["ghsa_id"], "model:" + m, row["p_fail"][m],
                                 (row.get("model_version") or "unknown") + "@select")
         set_state(g, row["ghsa_id"], "selected", log, slug=slug_for(row), rank_file=os.path.basename(path),
                   p_fail=row["p_fail"], repo=row["repo"], fix_commit=row["fix_commit"],
-                  note="P(fail) " + ", ".join("%s %.2f" % (sources.label(m), row["p_fail"][m]) for m in MODELS))
+                  note="P(fail) " + ", ".join("%s %.2f" % (sources.label(m), row["p_fail"][m]) for m in models()))
     return picked
 
 
@@ -142,10 +152,12 @@ def write_package(g, st, row):
     d = os.path.join(LOOP_DIR, st["ghsa"])
     os.makedirs(d, exist_ok=True)
     for name in ("triage_prompt.md", "build_prompt.md", "TASK_BUILD_SPEC.md"):
-        src = os.path.join(PROMPTS, name)
+        src = os.path.join(prompts_dir(), name) if prompts_dir() else ""
         if os.path.exists(src):
             shutil.copy(src, os.path.join(d, name))
-    shutil.copy(os.path.join(sources.FINDER_DIR, "VALIDATION.md"), os.path.join(d, "VALIDATION.md"))
+    checklist = os.path.join(sources.FINDER_DIR, "VALIDATION.md") if sources.FINDER_DIR else ""
+    if os.path.exists(checklist):
+        shutil.copy(checklist, os.path.join(d, "VALIDATION.md"))
     task_dir = os.path.join(LOOP_TASKS, st["slug"])
     cand = g.get("cand:" + st["ghsa"]) or {}
     feats = cand.get("finder_features") or {}
@@ -162,7 +174,7 @@ def write_package(g, st, row):
         "- Advisory: https://github.com/advisories/%s" % st["ghsa"],
         "- Summary: %s" % (cand.get("summary") or row.get("summary") or ""),
         "- Predicted chance of failing one attempt: %s (vanguard %s)" % (
-            ", ".join("%s %.2f" % (sources.label(m), st["p_fail"][m]) for m in MODELS), row.get("model_version")),
+            ", ".join("%s %.2f" % (sources.label(m), st["p_fail"][m]) for m in models()), row.get("model_version")),
         "- Why: " + "; ".join("%s (%+.1f)" % (f, c) for f, c in row.get("why", [])),
         ("- Finder's guess: producer `%s`, check `%s`, shared field(s) %s; other producer candidates: %s" % (
             feats.get("producer_file"), feats.get("check_file"), ", ".join(feats.get("shared_fields") or []) or "none",
@@ -227,12 +239,12 @@ def model_settings():
 
 def start_round(st, plan, log):
     """plan: {model: attempts}. Starts one Harbor job per model; returns {model: job info}."""
-    models, mult = model_settings()
+    cfgs, mult = model_settings()
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     jobs = {}
     os.makedirs(sources.VANGUARD_JOBS, exist_ok=True)
     for key, attempts in plan.items():
-        m = models[key]
+        m = cfgs[key]
         name = "loop-%s-%s-%s" % (stamp, st["slug"], key.lower().replace("_", "-"))
         cmd = [validate_mod.HARBOR, "run", "-a", "terminus-2", "-m", m["model"], "--env-file", m["env_file"],
                "-k", str(attempts), "-n", str(attempts), "-o", sources.VANGUARD_JOBS, "--job-name", name, "-y", "-q",
@@ -272,9 +284,9 @@ def round_results(jobs):
 
 
 def env_problems():
-    models, _ = model_settings()
-    return ["%s env file missing: %s" % (sources.label(k), models[k]["env_file"]) for k in MODELS
-            if not models[k]["env_file"] or not os.path.exists(models[k]["env_file"])]
+    cfgs, _ = model_settings()
+    return ["%s env file missing: %s" % (sources.label(k), cfgs[k]["env_file"]) for k in models()
+            if not cfgs[k]["env_file"] or not os.path.exists(cfgs[k]["env_file"])]
 
 
 # ---------------------------------------------------------------- one tick
@@ -346,7 +358,7 @@ def advance(g, st, row, cfg, budget, opts, hooks, log):
         elif s in ("ready-to-run", "round2-approved"):
             attempts = 1 if s == "ready-to-run" else 2
             # after a crash only the missing attempts are re-run; valid results already in hand are kept
-            plan = st.get("pending") or {k: attempts for k in MODELS}
+            plan = st.get("pending") or {k: attempts for k in models()}
             need = sum(plan.values())
             if budget["model_runs"] < need:
                 if opts.get("run_models"):
