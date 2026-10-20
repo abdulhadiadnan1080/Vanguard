@@ -4,7 +4,7 @@
 
 ### Failure intelligence for LLM coding agents
 
-**A self-improving knowledge graph that predicts which real-world security fixes an AI coding agent will fail, before you spend anything running it.**
+**A self-improving knowledge graph that predicts which real-world fixes an AI coding agent will fail, before you spend anything running it.**
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square)](#quick-start)
 [![Dependencies: none](https://img.shields.io/badge/dependencies-standard%20library%20only-2ea44f?style=flat-square)](#quick-start)
