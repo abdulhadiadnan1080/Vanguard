@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Agent Failure Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: slim header, then the graph canvas (flexible) beside a fixed-width inspector; stacks below 900px. Node index at the foot. */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --fg:#17202b; --muted:#566274; --line:#d6dce4; --edge:#a3aebb; --accent:#2f46c9;
+  --t-model:#17202b; --t-weak:#c2334a; --t-cond:#b06f12; --t-task:#2f6fb5; --t-find:#7048b8; --t-reason:#a64a94;
+  --t-code:#7d6a50; --t-strength:#1f8159; --t-design:#4a5d75; --t-method:#3f8593;
+  --ok:#1f8159; --bad:#c2334a;
+  --font-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e131a; --surface:#151c25; --fg:#e3e8ee; --muted:#94a1b2; --line:#283340; --edge:#4c5a6b; --accent:#8d9cff;
+    --t-model:#e3e8ee; --t-weak:#f06a7e; --t-cond:#e3a54a; --t-task:#68a6ea; --t-find:#ab88ef; --t-reason:#d88aca;
+    --t-code:#bca98d; --t-strength:#4cc292; --t-design:#9cb0c7; --t-method:#78c0cc;
+    --ok:#4cc292; --bad:#f06a7e; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e131a; --surface:#151c25; --fg:#e3e8ee; --muted:#94a1b2; --line:#283340; --edge:#4c5a6b; --accent:#8d9cff;
+  --t-model:#e3e8ee; --t-weak:#f06a7e; --t-cond:#e3a54a; --t-task:#68a6ea; --t-find:#ab88ef; --t-reason:#d88aca;
+  --t-code:#bca98d; --t-strength:#4cc292; --t-design:#9cb0c7; --t-method:#78c0cc;
+  --ok:#4cc292; --bad:#f06a7e; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1440px;margin:0 auto;display:grid;gap:16px}
+header{display:grid;gap:6px}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--font-display);font-weight:600;font-size:clamp(24px,3.2vw,34px);line-height:1.1;margin:0;text-wrap:balance}
+.lede{margin:0;color:var(--muted);max-width:72ch}
+.facts{display:flex;flex-wrap:wrap;gap:6px 18px;font-family:var(--font-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.facts b{color:var(--fg);font-weight:500}
+
+.models{display:grid;gap:6px;margin-top:4px}
+.mrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.mlabel{font:500 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.mchip{font:500 12.5px var(--font-body);padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--fg)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{font:500 12px/1 var(--font-body);display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;
+  border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.chip .dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.chip[aria-pressed="false"]{color:var(--muted);background:transparent}
+.chip[aria-pressed="false"] .dot{background:transparent;box-shadow:inset 0 0 0 1.5px var(--c)}
+.chip:focus-visible,.btn:focus-visible,.search:focus-visible,.conn button:focus-visible,.idx button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.spacer{flex:1}
+.search{font:13px var(--font-body);padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);width:200px;max-width:100%}
+.btn{font:500 12px var(--font-body);padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.canvas{position:relative;height:clamp(460px,74vh,860px);background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.canvas svg{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+.canvas svg:active{cursor:grabbing}
+.hint{position:absolute;left:12px;bottom:10px;font-size:11px;color:var(--muted);font-family:var(--font-mono);pointer-events:none}
+.legend-ring{position:absolute;right:12px;bottom:10px;display:flex;gap:12px;font-size:11px;color:var(--muted);font-family:var(--font-mono);pointer-events:none}
+.legend-ring span{display:inline-flex;align-items:center;gap:5px}
+.legend-ring i{width:10px;height:10px;border-radius:50%;background:var(--t-task);box-shadow:0 0 0 2px var(--c)}
+
+.link{stroke:var(--edge);stroke-width:1.1;fill:none;opacity:.7}
+.link.on{stroke:var(--accent);stroke-width:1.8;opacity:1}
+.link.dim{opacity:.12}
+.elabel{font:10.5px var(--font-mono);fill:var(--accent);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round;display:none;pointer-events:none}
+.elabel.on{display:block}
+#arrow path{fill:var(--edge)}#arrow-on path{fill:var(--accent)}
+.node{cursor:pointer}
+.node circle{stroke:var(--surface);stroke-width:1.5}
+.node text{font:12px var(--font-body);fill:var(--fg);paint-order:stroke;stroke:var(--surface);stroke-width:3.5px;stroke-linejoin:round;pointer-events:none}
+.node.big text{font:600 13.5px var(--font-display)}
+.node.minor text{font-size:11px;fill:var(--muted)}
+.node.dim{opacity:.18}
+.node.match circle{stroke:var(--accent);stroke-width:3}
+.node.sel circle{stroke:var(--accent);stroke-width:3.5}
+.node:focus{outline:none}.node:focus-visible circle{stroke:var(--accent);stroke-width:3.5}
+.node.task circle{stroke-width:2.6}
+.node.task.solved circle{stroke:var(--ok)}
+.node.task.failed circle{stroke:var(--bad)}
+.node.task.sel circle{stroke:var(--accent)}
+.t-model{--c:var(--t-model)}.t-weak{--c:var(--t-weak)}.t-cond{--c:var(--t-cond)}.t-task{--c:var(--t-task)}.t-find{--c:var(--t-find)}
+.t-reason{--c:var(--t-reason)}.t-code{--c:var(--t-code)}.t-strength{--c:var(--t-strength)}.t-design{--c:var(--t-design)}.t-method{--c:var(--t-method)}
+.node circle{fill:var(--c)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:12px;min-width:0;
+  max-height:clamp(460px,74vh,860px);overflow:auto}
+.ptype{display:flex;align-items:center;gap:8px}
+.ptype .dot{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.panel h2{font-family:var(--font-display);font-weight:600;font-size:20px;line-height:1.2;margin:0;text-wrap:balance}
+.pill{display:inline-block;font:500 11px var(--font-mono);padding:3px 8px;border-radius:999px;border:1px solid currentColor;width:max-content}
+.pill.failed{color:var(--bad)}.pill.solved{color:var(--ok)}
+.panel p{margin:0;max-width:62ch}
+.quote{border-left:2px solid var(--t-weak);padding-left:10px;font-style:italic;color:var(--muted)}
+dl.meta{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12.5px;font-variant-numeric:tabular-nums}
+dl.meta dt{color:var(--muted)}dl.meta dd{margin:0;font-family:var(--font-mono);font-size:12px;min-width:0;overflow-wrap:anywhere}
+.conn h3{font:500 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:4px 0 6px}
+.conn ul{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.conn li{display:flex;gap:8px;align-items:baseline;font-size:12.5px;min-width:0}
+.conn .rel{font-family:var(--font-mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.conn button,.idx button{all:unset;cursor:pointer;color:var(--fg);border-bottom:1px solid var(--line);min-width:0}
+.conn button:hover,.idx button:hover{color:var(--accent);border-color:var(--accent)}
+.conn .dot,.idx .dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none;align-self:center}
+
+.index{display:grid;gap:10px}
+.index h2{font-family:var(--font-display);font-weight:600;font-size:18px;margin:8px 0 0}
+.idxgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px 24px}
+.idx h3{font:500 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;display:flex;gap:6px;align-items:center}
+.idx ul{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:13px}
+.idx li{display:flex;gap:8px;align-items:baseline;min-width:0}
+.idx .sc{font:11px var(--font-mono);color:var(--muted);margin-left:auto;white-space:nowrap}
+.idx .sc.failed{color:var(--bad)}.idx .sc.solved{color:var(--ok)}
+
+@media (max-width:900px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .canvas{height:clamp(420px,68vh,640px)}
+  .panel{max-height:none}
+  .search{width:100%}
+  .spacer{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Knowledge graph</div>
+    <h1>Weaknesses and failure patterns of LLM coding agents</h1>
+    <p class="lede">A map of where large language models break down when they fix real security vulnerabilities: each weakness, the conditions that trigger it, the evidence behind it, the tasks that expose it, and what that means for designing harder tasks. Select a node to read its detail and follow its connections.</p>
+    <div class="models">
+      <div class="mrow"><span class="mlabel">Applies to models such as</span><span class="mchip">GPT</span><span class="mchip">Claude</span><span class="mchip">Gemini</span><span class="mchip">Qwen</span><span class="mchip">Kimi</span><span class="mchip">GLM</span><span class="mchip">Llama</span><span class="mchip">Mistral</span></div>
+    </div>
+    <div class="facts">
+      <span><b>~66</b> graded runs</span>
+      <span><b>19/19</b> runs fail in the primary shape</span>
+      <span>real agent-protocol SDK <b>pass@3 = 0</b></span>
+      <span><b>3</b> knowledge-base entries, <b>2</b> models</span>
+    </div>
+  </header>
+
+  <div class="toolbar" id="toolbar" aria-label="Filter node types"></div>
+
+  <div class="stage">
+    <div class="canvas" id="canvas">
+      <div class="hint">drag to pan · scroll or pinch to zoom · click a node</div>
+      <div class="legend-ring"><span class="t-ok" style="--c:var(--ok)"><i></i>solved</span><span style="--c:var(--bad)"><i></i>failed</span></div>
+    </div>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+
+  <section class="index">
+    <h2>All nodes</h2>
+    <div class="idxgrid" id="index"></div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+const TYPES = {
+  model:{name:"Model"}, weak:{name:"Weakness"}, cond:{name:"Trigger condition"}, find:{name:"Evidence"},
+  reason:{name:"Dismissal reason"}, task:{name:"Task"}, code:{name:"Code entity"}, strength:{name:"Strength"},
+  design:{name:"Task-design implication"}, method:{name:"Method"}
+};
+
+const N = [
+  {id:"ds",type:"model",label:"Model A",title:"Model A",r:22,
+   detail:["Studied on security-fix tasks built from real, unmodified open-source vulnerabilities, and on controlled variants that put back parts of real upstream fixes into healthy code.","One primary weakness, reproduced on a real repository at pass@3 = 0 with its cause isolated, and three secondary patterns."],
+   meta:[["Reasoning","enabled, maximum effort"],["Also in knowledge base","unreported sibling sites"]]},
+  {id:"mB",type:"model",label:"Model B",title:"Model B",r:18,
+   detail:["A second model tracked in the weakness knowledge base. Its recorded results are smaller: one supported weakness of its own, plus the single-explicit-check tasks that both models solve."],
+   meta:[["Weaknesses recorded","1 (stacked vulnerabilities)"],["Shared anti-weakness","single explicit check"]]},
+
+  {id:"W0",type:"weak",label:"Assumptions",title:"Primary weakness: a spotted risk dismissed with an untested assumption",r:20,
+   detail:["Some fixes need two coordinated changes: the check that decides allowed or not, and the data producer (schema, serializer, parser, loader) that creates or reloads the data the check relies on. If the producer drops the security field, the check is bypassed on that path.","The model fixes the check every time. It notices that the producer drops the field and thinks about the save-and-reload path, then closes the question with an assumption about how other code behaves, never verifies it, and stops once the existing tests pass."],
+   quotes:["“If parsed, issuer is unknown and removed! This is critical.” … a few sentences later: “Fine. Gate done.”","“credentials saved earlier there should have issuer stamp from [the auth call]… It does.”"],
+   meta:[["Runs failed in this shape","19 / 19"],["Failing tests","always the same 5"],["Real repository","widely used agent-protocol SDK, pass@3 = 0"],["Generic instructions","0 / 6 solved"],["Concrete failing test","3 / 3 solved"]]},
+  {id:"WA",type:"weak",label:"Nearby-bug capture",title:"Pattern A: a nearby real bug captures it, and it argues itself out of the correct fix",r:15,
+   detail:["The report describes one cause, and the code also contains a second real bug that explains the same symptom. The model identifies the reported cause early, then talks itself out of fixing it, typically because the correct fix refuses a setup the report presents as normal use. It fixes the other bug and stops."],
+   quotes:["“If the same server instance is connected to one transport only, okay” (repeated more than 10 times in Variant C)"],
+   meta:[["Variant C","failed 2 of 3 (one run solved it)"],["Variant E3","0.33"],["Variant D","0.55 (with primary)"],["Control Variant E1","solved"]]},
+  {id:"WB",type:"weak",label:"Report-bounded scope",title:"Pattern B: scope stops at what the report describes",r:15,
+   detail:["When an upstream fix closes several distinct flaws but the report describes one scenario, the model fixes that scenario cleanly and does not look for flaws of a different kind elsewhere.","It does reliably find repeated copies of the same flaw, even across files and languages. The miss is specific to different kinds of flaw the report does not suggest."],
+   meta:[["Git wrapper SN","0.29"],["AI agent framework SN","0.60"],["Both S1 controls","solved"]]},
+  {id:"WC",type:"weak",label:"Self-confirming verification",title:"Pattern C: self-confirming verification",r:15,
+   detail:["The model decides it is done once the existing test suite, typecheck and lint pass and its own reproduction of the reported scenario passes. Its probes go through the path it already fixed; it does not test the second path it considered and dismissed.","Where it did test the second path (2 of 3 B2 runs) it fixed it. A visible failing test on that path is the one intervention that flips the result."],
+   meta:[["Save-and-reload tested","0 / 12 failed runs"],["Concurrent repro in Variant C","none in 194 steps"],["Visible failing test","3 / 3 solved"]]},
+
+  {id:"WS",type:"weak",label:"Unreported sibling sites",title:"Unreported sibling sites: the same flaw at several sites, one reported",r:14,
+   detail:["The same flaw exists at several sites and the report shows only one. The model fixes the reported site and misses the siblings.","This conflicts with the repeated-pattern strength (an access-control library in C and Python, an HTTP client's 4 codecs, a serialiser, and a database driver's 3 parsing paths). The sources used different setups: the knowledge-base failures come from a hinted harness and from injected siblings, while the strength comes from impact-only agentic runs. The same database driver project appears on both sides, so a rerun is needed to settle it."],
+   meta:[["Models","Model A"],["KB status","supported"],["Miner weight","+1.5"],["Detect rule","≥ 2 repeated fix sites"],["Evidence","5 runs, 5 failures"],["Updated","2026-10-15"]]},
+  {id:"WK",type:"weak",label:"Stacked vulnerabilities",title:"Stacked vulnerabilities: several independent bugs in one task",r:14,
+   detail:["Several distinct vulnerabilities in one task. The model fixes one, assumes it is done and stops, or runs out of time.","Caveat: 2 of the 3 failures hit a 60-minute limit and still need 120-minute reruns, so only 1 failure so far is a clear early stop. The controlled study ran with no time limit."],
+   meta:[["Models","Model B"],["KB status","supported"],["Miner weight","+1.0"],["Detect rule","≥ 2 advisories in the same repo"],["Evidence","7 runs, 3 failures"],["Updated","2026-10-15"]]},
+  {id:"WX",type:"strength",label:"Single explicit check (anti-weakness)",title:"Anti-weakness: one missing check in one place",
+   detail:["Both models solve these, especially when the report names the check. The miner subtracts points so such candidates rank lower."],
+   meta:[["Models","Model A and Model B"],["KB status","supported"],["Miner weight","−1.0"],["Detect rule","1 source file and ≤ 2 hunks"],["Evidence","8 runs, 0 failures"]]},
+  {id:"cs",type:"cond",label:"Same change at ≥ 2 sites",title:"The upstream fix repeats the same change at 2 or more separate sites",detail:["Different functions or files, with only one site described in the report."]},
+  {id:"ck",type:"cond",label:"≥ 2 independent bugs",title:"The task requires fixing 2 or more independent vulnerabilities",detail:["The miner detects this as 2 or more advisories in the same repository."]},
+  {id:"cx",type:"cond",label:"1 file, ≤ 2 hunks",title:"The fix is 1 source file with at most 2 hunks, or the advisory title states the missing check",detail:["When this holds, both models solve the task."]},
+  {id:"fdrv",type:"find",label:"Driver: encoded variants missed",title:"Database driver (hinted harness): fixed the reported path, still accepted encoded variants",detail:["2026-10-14. The model fixed the reported decoding path but still accepted encoded variants."],meta:[["Runs","2"],["Failures","2"],["Harness","hinted"]]},
+  {id:"finj",type:"find",label:"Injected siblings: 3/3 missed",title:"Java data-binding library with injected siblings: the same 3 missed every run",detail:["The same 3 injected sibling sites were missed in all 3 runs."],meta:[["Runs","3"],["Failures","3"]]},
+  {id:"fstk",type:"find",label:"Stacking track: 3 of 7 failed",title:"Stacking track: 3 failures in 7 runs",detail:["A budgeting app stopped early. An SSH library and a third project ran out of the 60-minute limit and need 120-minute reruns."],meta:[["Runs","7"],["Failures","3"],["Clear early stop","1"],["Timeouts","2"]]},
+  {id:"fsgl",type:"find",label:"Single checks: 0 of 8 failed",title:"Single-check tasks: no failures for either model",detail:["A JWT signature task: both models solved it 3/3 in agentic runs. A Python web-toolkit advisory: both reproduced the upstream line in a manual review."],meta:[["Runs","8"],["Failures","0"]]},
+  {id:"c1",type:"cond",label:"Check + producer fix",title:"The fix needs a data-producer change as well as the check",detail:["The producer is a schema, serializer, parser, loader or normaliser. All four conditions must hold for the primary weakness to trigger."]},
+  {id:"c2",type:"cond",label:"Save/load boundary",title:"The producer drops the field across a time or storage boundary",detail:["Data saved now and loaded later, rather than a direct call from the check. When the check calls the producer directly with a straightforward data flow (the Go role-escalation task), the model does not fail."]},
+  {id:"c3",type:"cond",label:"Report covers check path only",title:"The report describes the impact through the check's path only",detail:["The second path is not described concretely. One sentence describing it is enough to flip the result (Variant B2, 3/3)."]},
+  {id:"c4",type:"cond",label:"Tests pass either way",title:"Existing repository tests pass whether or not the producer is fixed",detail:["In the agent-protocol SDK: about 980 tests plus typecheck and lint. None save and reload a credential, so everything passes and the model's usual done signal arrives early."]},
+  {id:"a1",type:"cond",label:"Decoy defect present",title:"A second real defect elsewhere also explains the reported symptom",detail:["Pattern A condition 1."]},
+  {id:"a2",type:"cond",label:"Fix restricts 'normal' use",title:"The correct fix restricts something the report presents as normal deployment",detail:["In Variant C the correct fix, refusing a second connection, was ruled out as something that “would break legitimate use”."]},
+  {id:"a3",type:"cond",label:"Needs concurrent repro",title:"Reproducing the bug needs a concurrent, multi-client setup",detail:["The model wrote no concurrent reproduction in 194 steps."]},
+
+  {id:"f19",type:"find",label:"19/19 on the same 5 tests",title:"Every run in the primary shape failed on the same 5 tests",
+   detail:["All failures are on the 5 tests for credentials persisted by the application and validated on load with the SDK schemas. All functional tests pass."],
+   meta:[["Real task 1","3/3 · 0.64"],["Variant B","3/3 · 0.64"],["Variant B3","1/1 · 0.64"],["Variant S2only","3/3 · 0.0"],["Variant Breach","3/3 · 0.64"],["Variant D","1/1 · 0.55"],["Variant Bverify","3/3 · 0.64"],["Variant Baudit","3/3 · 0.64"],["Total","19 / 19"]]},
+  {id:"fknow",type:"find",label:"Not a knowledge gap",title:"Not a knowledge gap: it explains the bug when asked",detail:["Direct questions, no agent, 3 tries each: “issuer is removed” 3/3, and “the secret leaks” 3/3 with the correct explanation."]},
+  {id:"fskill",type:"find",label:"Not a skill gap",title:"Not a skill gap: one sentence pointing at the path is enough",detail:["In the 3 solved Variant B2 runs, the model joins “the schema strips issuer” and “saved credentials pass through the schema” into one thought early, at steps 12–24. It then fixes the schema, and in 2 of 3 runs writes its own save-and-reload check."]},
+  {id:"fnotice",type:"find",label:"It notices the risk",title:"It notices the risk during the task",detail:["Step-by-step reading of 12 failed runs."],meta:[["Noticed the strip","11 / 12"],["Thought about saved credentials","11 / 12"],["Both in the same run","10 / 12"]]},
+  {id:"fstop",type:"find",label:"Stops on existing tests",title:"What stops it: an assumption, then the existing tests",detail:["In every analysed failure it ran the existing ~980 repository tests, typecheck and lint, none of which save and reload a credential."],meta:[["Dismissed with an assumption","10 / 12"],["Tested a save-and-reload","0 / 12"],["Stopped on tests + typecheck + lint","12 / 12"]]},
+  {id:"fgeneric",type:"find",label:"Reminders don't help",title:"Generic reminders do not help",detail:["Variant Bverify (“do not rely on assumptions about how other code handles this data; check each against the code”) and Variant Baudit (“make sure the protection holds for every way credential data can reach the token request”) both failed 3/3. The model follows evidence, not reminders."],meta:[["Solved","0 / 6"]]},
+  {id:"ftest",type:"find",label:"Failing test flips it",title:"A concrete failing test flips the result",detail:["Variant Bvistest adds one visible failing save-and-reload test to the repository: solved 3/3. Caveat: the test also points at the schema. It needs an executable signal that contradicts its assumption."],meta:[["Solved","3 / 3"]]},
+  {id:"fcomments",type:"find",label:"Comments not the cause",title:"Misleading “intentional” comments are not the cause",detail:["Variant B3 removed every “intentional / backward compatible” code comment. Still failed (0.64)."]},
+  {id:"flocation",type:"find",label:"Location not the cause",title:"Where the code sits is not the cause",detail:["Variant Breach placed the stripping schema directly inside the token-request function, on the reported path. Still failed 3/3; it read the helper and schema dozens of times."]},
+
+  {id:"r1",type:"reason",label:"“App keeps the issuer”",title:"“The application/provider keeps the issuer when saving”",detail:["Given in 10 of the 12 analysed failed runs. One run can give several reasons."]},
+  {id:"r2",type:"reason",label:"“Strip only hits network input”",title:"“The strip only affects network input”",detail:["Given in 7 of the 12 analysed failed runs."]},
+  {id:"r3",type:"reason",label:"“Type already has issuer”",title:"“The type definition already includes issuer”",detail:["Given in 4 of the 12 analysed failed runs."]},
+  {id:"r4",type:"reason",label:"“Out of scope”",title:"“Out of scope”",detail:["Given in 2 of the 12 analysed failed runs."]},
+  {id:"r5",type:"reason",label:"“Backward compatibility”",title:"“Backward compatibility”",detail:["Given in 2 of the 12 analysed failed runs."]},
+
+  {id:"ksdk",type:"code",label:"Widely used agent-protocol SDK",title:"A widely used agent-protocol SDK",r:11,detail:["Real repository for Real task 1. All variants use the same healthy snapshot with the real upstream fix put back in parts."]},
+  {id:"kcheck",type:"code",label:"Issuer check (F1)",title:"Issuer check on token requests (F1)",detail:["The OAuth client should send credentials only to the authorization server they belong to. If a credential has no issuer, the check allows it by design. The model fixed this in every attempt."]},
+  {id:"kschema",type:"code",label:"Credential validation schemas",title:"The client-information schema and the token schema",detail:["The SDK's own validation schemas drop unknown fields, so the issuer stamp is removed when an application loads saved credentials back through them. Left unchanged in all 3 real-task attempts."]},
+  {id:"kissuer",type:"code",label:"issuer stamp",title:"issuer field on each credential",detail:["Binds a credential to its authorization server. Once stripped, the check sees “no issuer” and a malicious tool server can collect the secret."]},
+  {id:"kfetch",type:"code",label:"Token-request function",title:"The token-request function",detail:["The function on the report's path: credentials are sent to the attacker's server through it."]},
+  {id:"kf2",type:"code",label:"Shared-server transport (F2)",title:"F2: a shared server instance's single transport is overwritten",detail:["One user's tool output is delivered to another user when one server instance is shared, because a second connection overwrites the transport. The model named this at step 31 of Variant C, then dismissed it."]},
+  {id:"kreqid",type:"code",label:"Request-ID collision (decoy)",title:"Request-ID collision in the shared transport",detail:["A real nearby bug. In Variant C the model built a large fix for it: passed the 2 shared-transport tests, failed all 4 shared-server tests."]},
+
+  // real tasks
+  {id:"t1",type:"task",label:"Added the missing signature check",title:"Added the missing JWT signature check",task:"Python auth library: JWT signature bypass",status:"solved",score:"3/3",detail:["Python. Fix needs one missing signature check."],real:true},
+  {id:"t2",type:"task",label:"Blocked file:// redirects",title:"Added a scheme check that blocks redirects to file://",task:"Python streaming tool: redirect to file://",status:"solved",score:"3/3",detail:["Python. Fix needs a scheme check on redirects."],real:true},
+  {id:"t3",type:"task",label:"Verified bundled wheels",title:"Added integrity verification for bundled wheels",task:"Python environment tool: bundled-wheel integrity",status:"solved",detail:["Python. Fix needs integrity verification of bundled wheels."],real:true},
+  {id:"t4",type:"task",label:"Limited trailer parsing",title:"Added limits to chunked-trailer parsing",task:"Python web server: chunked-trailer smuggling",status:"solved",detail:["Python. Fix needs trailer parsing limits."],real:true},
+  {id:"t5",type:"task",label:"Guarded both C and Python code",title:"Added the guard to both the C and the Python implementation",task:"Python access-control library: format-string disclosure",status:"solved",detail:["Python + C. Fix needs a guard in both the C and the Python implementation."],real:true},
+  {id:"t6",type:"task",label:"Capped async number length",title:"Added a number-length limit to the async parser",task:"Java JSON parser: async number length",status:"solved",detail:["Java. Fix needs a length limit in the async parser."],real:true},
+  {id:"t7",type:"task",label:"Checked every deserialiser",title:"Added length checks to all adjacent deserialisers",task:"JavaScript serialiser: typed-array length DoS",status:"solved",detail:["JavaScript. Fix needs length checks at adjacent deserialisers."],real:true},
+  {id:"t8",type:"task",label:"Limited all 4 codecs",title:"Added chunk limits to all 4 codecs, sync and async",task:"Python HTTP client: decompression chunk DoS",status:"solved",detail:["Python. Fix needs chunk limits in 4 codecs, sync and async."],real:true},
+  {id:"t9",type:"task",label:"Left the issuer-stripping schemas",title:"Fixed the issuer check but left the schemas that strip issuer",task:"Real task 1: widely used agent-protocol SDK, OAuth issuer confusion",status:"failed",score:"0.64 ×3",r:12,real:true,
+   detail:["The fix needs (a) an issuer check on token requests and (b) changes to the core validation schemas that strip issuer. The model fixed the check in all 3 attempts and left the schemas unchanged in all 3. pass@3 = 0."]},
+  {id:"t10",type:"task",label:"Fixed check and role loader",title:"Fixed both the permission middleware and the role loader",task:"Go DevOps web app: custom-role escalation",status:"solved",score:"3/3",r:10,real:true,
+   detail:["Go. Fix needs (a) permission middleware and (b) a role loader scoped to the project. Contrast case: the loader is called by the check and the data flow is direct, so the primary weakness does not apply."]},
+  // variants
+  {id:"t11",type:"task",label:"Fixed the issuer check",title:"Fixed the issuer check when it was the only bug",task:"Variant A: F1 check only",status:"solved",score:"3/3",detail:["Report: credentials sent to the attacker's server via the token-request function. Shows the task is fair and solvable."]},
+  {id:"t12",type:"task",label:"Missed the schema strip",title:"Fixed the check, missed the schemas that strip issuer",task:"Variant B: F1 check + schemas that strip issuer",status:"failed",score:"0.64 ×3",r:10,detail:["Same report as A. Changing only the producer flips 3/3 solved into 3/3 failed, so the producer causes the failure. Parent of the isolation experiments."]},
+  {id:"t13",type:"task",label:"Fixed the schema once hinted",title:"Fixed the schema once one sentence pointed at save-and-reload",task:"Variant B2: B + one-sentence hint",status:"solved",score:"3/3",detail:["A's report plus one sentence describing save-and-reload through the SDK schemas."]},
+  {id:"t14",type:"task",label:"Missed strip without comments",title:"Still missed the schema strip with the “intentional” comments removed",task:"Variant B3: B with “intentional” comments removed",status:"failed",score:"0.64",detail:["Every “intentional / backward compatible” code comment removed. Report same as A. 1/1 failed."]},
+  {id:"t15",type:"task",label:"Missed the lone schema bug",title:"Could not find the schema strip when it was the only bug",task:"Variant S2only: schemas only (check already fixed)",status:"failed",score:"0.0 ×3",detail:["The schemas are the only bug. The model cannot find the producer when it is the only bug."]},
+  {id:"t16",type:"task",label:"Missed strip in token request",title:"Still missed the schema strip when it sat inside the token-request function",task:"Variant Breach: stripping schema inside the token-request function",status:"failed",score:"0.64 ×3",detail:["Same as B, plus the stripping schema placed directly inside the reported function."]},
+  {id:"t17",type:"task",label:"Ignored “check assumptions”",title:"Missed the schema strip despite a reminder to check assumptions",task:"Variant Bverify: B + “check your assumptions”",status:"failed",score:"0.64 ×3",detail:["Report adds: “do not rely on assumptions about how other code handles this data; check each against the code”."]},
+  {id:"t18",type:"task",label:"Ignored “cover every path”",title:"Missed the schema strip despite a reminder to cover every data path",task:"Variant Baudit: B + “cover every data path”",status:"failed",score:"0.64 ×3",detail:["Report adds: “make sure the protection holds for every way credential data can reach the token request”."]},
+  {id:"t19",type:"task",label:"Fixed schema after failing test",title:"Fixed the schema once a visible test failed on save-and-reload",task:"Variant Bvistest: B + one visible failing test",status:"solved",score:"3/3",detail:["Same as B, plus one visible failing save-and-reload test in the repository. Report same as A."]},
+  {id:"t20",type:"task",label:"Fixed decoy, missed shared server",title:"Fixed the request-ID decoy and left the shared-server bug open",task:"Variant C: F1 check + F2 cross-user output",status:"failed",score:"0.73, 0.73, 1.0",detail:["Failed 2 of 3 runs (0.73 and 0.73); one run solved it (1.0). Both bugs described in the report. In a failed run it named the real cause at step 31, dismissed it more than 10 times, and built a large fix for a request-ID collision instead."]},
+  {id:"t21",type:"task",label:"Missed schema and shared server",title:"Missed both the schema strip and the shared-server bug",task:"Variant D: B + F2",status:"failed",score:"0.55",detail:["Both described. Same miss as C, plus the primary weakness."]},
+  {id:"t22",type:"task",label:"Fixed the single-site bug",title:"Fixed the shared-server bug when it had one site and no decoy",task:"Variant E1: F2 at the one reported site",status:"solved",score:"1/1",detail:["F2 report. No alternative bug available: solved. Control for pattern A."]},
+  {id:"t23",type:"task",label:"Chased decoy across 3 sites",title:"Fixed the shared-transport decoy and left the 3 shared-server sites open",task:"Variant E3: F2 at all 3 sites",status:"failed",score:"0.33",detail:["Same F2 report. Fixed the shared-transport issue and left the reported shared-server case open."]},
+  {id:"t24a",type:"task",label:"Fixed tag-name injection",title:"Fixed option injection in tag creation",task:"Git wrapper S1: tag creation only",status:"solved",detail:["Report: tag creation with an attacker-influenced name makes git read an arbitrary file."]},
+  {id:"t24b",type:"task",label:"Missed 5 other injection gaps",title:"Fixed tag creation, missed 5 other option-injection gaps",task:"Git wrapper SN: 6 functions with option-injection gaps",status:"failed",score:"0.29",detail:["Same tag-creation report. Fixed tag creation; missed diff -O, index diff, blame --contents and --ignore-revs-file, and ls-remote --exec."]},
+  {id:"t25",type:"task",label:"Capped the DataInput parser",title:"Added the length limit to the DataInput parser",task:"Java JSON parser S1: DataInput parser limit only",status:"solved",detail:["Sibling parsers already safe. DataInput scenario in the report."]},
+  {id:"t26a",type:"task",label:"Fixed the slot leak",title:"Fixed the concurrency-slot leak on early stream end",task:"AI agent framework S1: concurrency-slot leak",status:"solved",detail:["Report: a concurrency-limited model keeps its slot when a streamed request ends early."]},
+  {id:"t26b",type:"task",label:"Missed shared-limiter deadlock",title:"Fixed the slot leak, missed the shared-limiter deadlock",task:"AI agent framework SN: leak + shared-limiter deadlock",status:"failed",score:"0.60",detail:["Same streamed-disconnect report. Fixed the slot leak; missed the deadlock when one limiter is shared by an agent and its model."]},
+  {id:"t27",type:"task",label:"Fixed the middleware",title:"Fixed the permission middleware when it was the only bug",task:"Role escalation A (control): middleware only",status:"solved",score:"1/1",detail:["Same report as the full role-escalation task."]},
+
+  {id:"s1",type:"strength",label:"Never breaks functionality",title:"Never breaks legitimate functionality",detail:["0 functional-test failures across all graded runs. Its fixes are conservative."]},
+  {id:"s2",type:"strength",label:"Repeated-pattern fixes",title:"Strong on single-location and repeated-pattern fixes",detail:["Finds repeated copies of the same flaw across files and languages: an access-control library in both C and Python, a database driver with 3 parsing paths, an HTTP client with 4 codecs sync and async, and a serialiser with adjacent deserialisers.","The weakness knowledge base records the opposite for sibling sites in other setups; see Unreported sibling sites."]},
+  {id:"s3",type:"strength",label:"Follows a named path",title:"Strong when the report names the path",detail:["Even abstractly, in one sentence (Variant B2)."]},
+  {id:"s4",type:"strength",label:"Traces call graphs",title:"Traces call graphs well",detail:["Finds every function that calls into the check and every function the check calls (the Go role-escalation task)."]},
+  {id:"s5",type:"strength",label:"Persistent",title:"Persistent",detail:["Runs of 100–200 steps with no timeouts."]},
+
+  {id:"d1",type:"design",label:"Producer + check sites",title:"Ingredient 1: a data-producer site plus a check site",detail:["The producer transforms or drops the security field across a save/load or serialize/parse boundary, not through a direct call from the check. Rare in real advisories: roughly 5 of 45 multi-file fixes reviewed had this shape."]},
+  {id:"d2",type:"design",label:"Report leads to the check",title:"Ingredient 2: an impact-only report that leads to the check",detail:["The report does not describe the second path concretely."]},
+  {id:"d3",type:"design",label:"Early “done” signal",title:"Ingredient 3: repository tests that pass either way",detail:["Its usual done signal is reached early."]},
+  {id:"d4",type:"design",label:"Optional decoy defect",title:"Ingredient 4 (optional): a nearby real defect explaining the same symptom",detail:["With a correct fix that restricts something presented as normal."]},
+  {id:"dsafe",type:"design",label:"Task-quality safeguards",title:"Task-quality safeguards",detail:["Tests check outcomes, never error text or internal names. Test setup never depends on code the model may legitimately harden. Every task is validated with the real fix (1.0, twice) and with no change (0.0)."]},
+  {id:"dnext",type:"design",label:"Next: second real repo",title:"In progress: a second real repository with the primary-weakness shape",detail:["Goal: reach pass@3 = 0 on another codebase."]},
+
+  {id:"mharness",type:"method",label:"Harbor terminus-2 harness",title:"Harness",detail:["Harbor 0.24.0 with the terminus-2 agent; the model works in a Docker container through a terminal. No network inside the task container. No time limit, and no run timed out.","Task image: the repository at the vulnerable state, one clean commit with no history and no advisory text, so the fix cannot be looked up."]},
+  {id:"mreport",type:"method",label:"Impact-only report",title:"Report given to the model",detail:["Impact-only: what an attacker can do, with no fix location, file names or payload.","Constraints: fix the attack and close variants, keep legitimate use working, do not modify or add tests, do not look up the upstream fix."]},
+  {id:"mtests",type:"method",label:"Hidden tests",title:"Hidden tests",detail:["Added only after the model stops. Security tests fail on vulnerable code and pass on a correct fix, and check outcomes, never error text. Functional tests make sure legitimate behaviour still works."]},
+  {id:"mscore",type:"method",label:"Score & acceptance",title:"Scoring and acceptance bar",detail:["Score = security tests passed ÷ total, or 0 if any functional test fails. Any score below 1.0 is a failure.","Acceptance: all 3 attempts below 1.0 (pass@3 = 0). Validation: the real upstream fix scores 1.0 twice, no change scores 0.0."]},
+  {id:"mrepro",type:"method",label:"Reproduction bundle",title:"Reproduction bundle",detail:["The reproduction bundle holds the real task, its hidden tests, the official fix, all 3 runs (step logs, terminal recordings, per-test results) and a setup checker, with step-by-step re-run instructions."]},
+  {id:"mkb",type:"method",label:"Weakness knowledge base",title:"Weakness knowledge base",detail:["One entry per weakness, each with the models it affects, a trigger, evidence, a miner weight and a detection rule.","Lifecycle: a weakness starts as a hypothesis, becomes supported once controlled experiments show it, and is proven once a holdout of real tasks confirms it. Rejected entries are ignored."],meta:[["Entries","3"],["Supported","3"],["Proven","0"]]},
+  {id:"mmine",type:"method",label:"Candidate miner",title:"Candidate miner",detail:["Scores candidate advisories with every weakness that is not rejected, adding that weakness's weight when its detection rule matches the real fix. Rules can check repeated fix sites, file, directory, function and hunk counts, summary text, CWEs, languages and advisories per repo."]},
+  {id:"dgap",type:"design",label:"Gap: primary weakness not in KB",title:"Gap: the primary weakness is missing from the knowledge base",detail:["The best-evidenced weakness, a check plus a data producer across a save/load boundary (19/19 failures, pass@3 = 0 on a real repository), has no knowledge-base entry, so the miner does not score candidates for it. Patterns A, B and C are missing too.","Ingredient 1 already describes a detection rule: a fix that touches both a check and a schema, serializer, parser or loader. Under the knowledge base's lifecycle it would enter as supported, and the second real repository in progress would make it proven."]},
+];
+
+const E = [
+  ["ds","W0","exhibits"],["ds","WA","exhibits"],["ds","WB","exhibits"],["ds","WC","exhibits"],
+  ["ds","s1","shows"],["ds","s2","shows"],["ds","s3","shows"],["ds","s4","shows"],["ds","s5","shows"],
+  ["W0","c1","triggers when"],["W0","c2","triggers when"],["W0","c3","triggers when"],["W0","c4","triggers when"],
+  ["WA","a1","triggers when"],["WA","a2","triggers when"],["WA","a3","triggers when"],
+  ["W0","r1","dismissed via"],["W0","r2","dismissed via"],["W0","r3","dismissed via"],["W0","r4","dismissed via"],["W0","r5","dismissed via"],
+  ["WC","W0","keeps it unchallenged"],["c4","WC","feeds"],
+  ["f19","W0","evidence for"],["fknow","W0","rules out cause"],["fskill","W0","rules out cause"],["fnotice","W0","evidence for"],
+  ["fstop","W0","evidence for"],["fstop","WC","evidence for"],["fgeneric","W0","evidence for"],["ftest","WC","breaks"],
+  ["fcomments","W0","rules out cause"],["flocation","W0","rules out cause"],
+  // code
+  ["ksdk","kschema","contains"],["ksdk","kcheck","contains"],["ksdk","kf2","contains"],["ksdk","kreqid","contains"],
+  ["kfetch","kcheck","runs"],["kschema","kissuer","strips"],["kcheck","kissuer","relies on"],
+  ["kschema","c2","instance of"],["kreqid","a1","instance of"],["kf2","a2","fix restricts"],
+  // real tasks
+  ["t9","W0","fails via"],["t9","WC","fails via"],["t9","ksdk","in repo"],["t9","kcheck","fixed"],["t9","kschema","left unfixed"],["t9","f19","counted in"],
+  ["t10","W0","contrast case"],["t10","s4","shows"],["t27","t10","control for"],
+  ["t5","s2","shows"],["t7","s2","shows"],["t8","s2","shows"],["t6","t25","same codebase"],
+  // variant tree
+  ["ksdk","t11","variants built on"],["t11","t12","+ producer bug"],
+  ["t12","t13","+ one-sentence hint"],["t12","t14","− comments"],["t12","t15","check pre-fixed"],["t12","t16","schema inside token request"],
+  ["t12","t17","+ verify reminder"],["t12","t18","+ audit reminder"],["t12","t19","+ failing test"],["t12","t21","+ F2"],
+  ["t12","W0","fails via"],["t12","f19","counted in"],
+  ["t13","fskill","shows"],["t13","s3","shows"],["t14","fcomments","shows"],["t16","flocation","shows"],["t16","kfetch","modifies"],
+  ["t17","fgeneric","shows"],["t18","fgeneric","shows"],["t19","ftest","shows"],["t15","W0","fails via"],
+  ["t11","t20","+ F2"],["t20","WA","fails via"],["t20","kreqid","fixed decoy"],["t20","kf2","missed"],["t20","WC","fails via"],
+  ["t21","WA","fails via"],["t21","W0","fails via"],["t22","t23","bug at all 3 sites"],["t23","WA","fails via"],["t22","WA","control"],
+  ["t24a","t24b","+ 5 other flaws"],["t24b","WB","fails via"],["t26a","t26b","+ deadlock"],["t26b","WB","fails via"],
+  // design
+  ["W0","d1","informs"],["W0","d2","informs"],["WC","d3","informs"],["WA","d4","informs"],
+  ["dnext","W0","aims to reproduce"],["dsafe","mtests","governs"],
+  // method
+  ["mharness","ds","runs"],["mreport","mharness","given via"],["mreport","c3","enables"],["mtests","mscore","feeds"],["mscore","t9","pass@3 = 0 met"],["mrepro","t9","packages"],
+  // knowledge base
+  ["ds","WS","exhibits"],["mB","WK","exhibits"],["ds","WX","shows"],["mB","WX","shows"],
+  ["WS","cs","triggers when"],["WK","ck","triggers when"],["WX","cx","holds when"],
+  ["fdrv","WS","evidence for"],["finj","WS","evidence for"],["fstk","WK","evidence for"],["fsgl","WX","evidence for"],["t1","fsgl","counted in"],
+  ["WS","s2","contradicts"],["t23","WS","also fits"],["WK","WB","similar shape to"],
+  ["WS","mkb","recorded in"],["WK","mkb","recorded in"],["WX","mkb","recorded in"],["mkb","mmine","feeds"],
+  ["dgap","mkb","missing from"],["dgap","W0","should add"],["dnext","dgap","would prove"],
+];
+
+
+const byId = Object.fromEntries(N.map(n=>[n.id,n]));
+const links = E.map(([s,t,l])=>({source:s,target:t,label:l}));
+N.forEach(n=>{
+  if(!n.r) n.r = n.type==="task" ? (n.status==="failed"?8:7) : n.type==="weak"?15 : n.type==="model"?22 : 8;
+  n.big = n.r>=12;
+});
+const minorTypes = new Set(["reason"]);
+
+const ANCH = {model:[600,460],weak:[620,470],cond:[960,200],reason:[1060,520],find:[820,760],task:[300,500],code:[330,140],strength:[480,860],design:[1060,860],method:[120,820]};
+const sim = d3.forceSimulation(N)
+  .force("link", d3.forceLink(links).id(d=>d.id).distance(l=>{
+    const a=l.source.type,b=l.target.type; return (a==="task"&&b==="task")?55:(a===b?70:95);
+  }).strength(.5))
+  .force("charge", d3.forceManyBody().strength(d=>d.big?-700:-260))
+  .force("collide", d3.forceCollide(d=>d.r+16))
+  .force("x", d3.forceX(d=>ANCH[d.type][0]).strength(.07))
+  .force("y", d3.forceY(d=>ANCH[d.type][1]).strength(.07))
+  .stop();
+for(let i=0;i<500;i++) sim.tick();
+
+const canvas = document.getElementById("canvas");
+const svg = d3.select(canvas).insert("svg",":first-child").attr("role","img").attr("aria-label","Knowledge graph of coding-agent weaknesses");
+const defs = svg.append("defs");
+["arrow","arrow-on"].forEach(id=>defs.append("marker").attr("id",id).attr("viewBox","0 0 10 10").attr("refX",9).attr("refY",5)
+  .attr("markerWidth",6).attr("markerHeight",6).attr("orient","auto-start-reverse").append("path").attr("d","M0,1 L9,5 L0,9 z"));
+const root = svg.append("g");
+const zoom = d3.zoom().scaleExtent([.25,4]).on("zoom", e=>root.attr("transform", e.transform));
+svg.call(zoom).on("dblclick.zoom",null);
+svg.on("click", e=>{ if(e.target===svg.node()) select(null); });
+
+const linkSel = root.append("g").selectAll("line").data(links).join("line").attr("class","link").attr("marker-end","url(#arrow)");
+const elabSel = root.append("g").selectAll("text").data(links).join("text").attr("class","elabel").attr("text-anchor","middle").text(d=>d.label);
+const nodeSel = root.append("g").selectAll("g").data(N).join("g")
+  .attr("class",d=>`node t-${d.type}${d.type==="task"?" task "+d.status:""}${d.big?" big":""}${minorTypes.has(d.type)?" minor":""}`)
+  .attr("tabindex",0).attr("role","button").attr("aria-label",d=>`${TYPES[d.type].name}: ${d.title}`)
+  .on("click",(e,d)=>{e.stopPropagation(); select(d.id);})
+  .on("keydown",(e,d)=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault(); select(d.id);} })
+  .call(d3.drag()
+    .on("start",(e,d)=>{ if(!e.active) sim.alphaTarget(.15).restart(); d.fx=d.x; d.fy=d.y; })
+    .on("drag",(e,d)=>{ d.fx=e.x; d.fy=e.y; })
+    .on("end",(e,d)=>{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+nodeSel.append("circle").attr("r",d=>d.r);
+nodeSel.append("text").attr("x",d=>d.r+5).attr("dy",".35em").text(d=>d.label);
+nodeSel.append("title").text(d=>d.title);
+
+function draw(){
+  linkSel.each(function(l){
+    const dx=l.target.x-l.source.x, dy=l.target.y-l.source.y, len=Math.hypot(dx,dy)||1;
+    const ux=dx/len, uy=dy/len;
+    this.setAttribute("x1", l.source.x+ux*l.source.r); this.setAttribute("y1", l.source.y+uy*l.source.r);
+    this.setAttribute("x2", l.target.x-ux*(l.target.r+3)); this.setAttribute("y2", l.target.y-uy*(l.target.r+3));
+  });
+  elabSel.attr("x",l=>(l.source.x+l.target.x)/2).attr("y",l=>(l.source.y+l.target.y)/2-3);
+  nodeSel.attr("transform",d=>`translate(${d.x},${d.y})`);
+}
+sim.on("tick", draw);
+draw();
+
+const hiddenTypes = new Set();
+function visible(n){ return !hiddenTypes.has(n.type); }
+function fit(dur){
+  const vis=N.filter(visible); if(!vis.length) return;
+  const W=canvas.clientWidth, H=canvas.clientHeight;
+  const x0=d3.min(vis,d=>d.x-d.r)-20, x1=d3.max(vis,d=>d.x+d.r)+150, y0=d3.min(vis,d=>d.y-d.r)-20, y1=d3.max(vis,d=>d.y+d.r)+20;
+  const s=Math.min(W/(x1-x0), H/(y1-y0), 1.6);
+  const t=d3.zoomIdentity.translate(W/2-s*(x0+x1)/2, H/2-s*(y0+y1)/2).scale(s);
+  (dur? svg.transition().duration(dur) : svg).call(zoom.transform,t);
+}
+
+let selected=null;
+function neighbors(id){
+  const out=[], inc=[];
+  links.forEach(l=>{ if(l.source.id===id) out.push(l); else if(l.target.id===id) inc.push(l); });
+  return {out,inc};
+}
+function select(id){
+  selected=id;
+  if(!id){
+    nodeSel.classed("dim",false).classed("sel",false);
+    linkSel.classed("on",false).classed("dim",false).attr("marker-end","url(#arrow)");
+    elabSel.classed("on",false);
+    renderOverview(); return;
+  }
+  const {out,inc}=neighbors(id); const nb=new Set([id,...out.map(l=>l.target.id),...inc.map(l=>l.source.id)]);
+  nodeSel.classed("dim",d=>!nb.has(d.id)).classed("sel",d=>d.id===id);
+  const on=l=>l.source.id===id||l.target.id===id;
+  linkSel.classed("on",on).classed("dim",l=>!on(l)).attr("marker-end",l=>on(l)?"url(#arrow-on)":"url(#arrow)");
+  elabSel.classed("on",on);
+  nodeSel.filter(d=>d.id===id).raise();
+  renderNode(byId[id]);
+}
+
+const panel=document.getElementById("panel");
+function el(tag,cls,text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+function typeRow(type){
+  const r=el("div","ptype t-"+type); r.append(el("span","dot"), el("span","eyebrow",TYPES[type].name)); return r;
+}
+function nodeButton(n){
+  const li=el("li"); const dot=el("span","dot"); li.classList.add("t-"+n.type);
+  const b=el("button",null,n.label); b.type="button"; b.addEventListener("click",()=>select(n.id));
+  li.append(dot,b); return li;
+}
+function renderNode(n){
+  panel.replaceChildren();
+  panel.append(typeRow(n.type), el("h2",null,n.title));
+  if(n.type==="task"){
+    if(n.task) panel.append(el("div","eyebrow","Task · "+n.task));
+    panel.append(el("span","pill "+n.status,(n.status==="failed"?"Failed":"Solved")+(n.score?" · "+n.score:"")+(n.real?" · real vulnerability":" · controlled variant")));
+  }
+  (n.detail||[]).forEach(p=>panel.append(el("p",null,p)));
+  (n.quotes||[]).forEach(q=>panel.append(el("p","quote",q)));
+  if(n.meta){ const dl=el("dl","meta"); n.meta.forEach(([k,v])=>dl.append(el("dt",null,k),el("dd",null,v))); panel.append(dl); }
+  const {out,inc}=neighbors(n.id);
+  const groups=[["Points to",out,l=>l.target],["Pointed to by",inc,l=>l.source]];
+  groups.forEach(([h,arr,pick])=>{
+    if(!arr.length) return;
+    const wrap=el("div","conn"); wrap.append(el("h3",null,`${h} (${arr.length})`));
+    const ul=el("ul");
+    arr.forEach(l=>{ const li=nodeButton(pick(l)); li.insertBefore(el("span","rel",l.label),li.firstChild); ul.append(li); });
+    wrap.append(ul); panel.append(wrap);
+  });
+}
+function renderOverview(){
+  panel.replaceChildren();
+  panel.append(el("div","eyebrow","Overview"), el("h2",null,"One primary weakness, three secondary patterns"));
+  panel.append(el("p",null,"The model fixes the security check every time. When the fix also needs a change to the code that saves and reloads the data the check relies on, it spots the risk, dismisses it with an assumption it never tests, and stops once the existing tests pass."));
+  const wrap=el("div","conn"); wrap.append(el("h3",null,"Start here")); const ul=el("ul");
+  ["W0","WA","WB","WC","t9","ftest"].forEach(id=>ul.append(nodeButton(byId[id]))); wrap.append(ul); panel.append(wrap);
+}
+
+// toolbar
+const tb=document.getElementById("toolbar");
+Object.entries(TYPES).forEach(([k,v])=>{
+  const b=el("button","chip t-"+k); b.type="button"; b.setAttribute("aria-pressed","true");
+  b.append(el("span","dot"), document.createTextNode(`${v.name} ${N.filter(n=>n.type===k).length}`));
+  b.addEventListener("click",()=>{
+    if(hiddenTypes.has(k)) hiddenTypes.delete(k); else hiddenTypes.add(k);
+    b.setAttribute("aria-pressed", String(!hiddenTypes.has(k)));
+    applyFilter();
+  });
+  tb.append(b);
+});
+tb.append(el("span","spacer"));
+const search=el("input","search"); search.type="search"; search.id="node-search"; search.placeholder="Find a node…"; search.setAttribute("aria-label","Find a node");
+search.addEventListener("input",()=>{
+  const q=search.value.trim().toLowerCase();
+  nodeSel.classed("match",d=>q.length>1 && (d.label+" "+d.title+" "+(d.task||"")).toLowerCase().includes(q));
+});
+search.addEventListener("keydown",e=>{
+  if(e.key!=="Enter") return;
+  const q=search.value.trim().toLowerCase(); const hit=N.find(d=>visible(d)&&(d.label+" "+d.title+" "+(d.task||"")).toLowerCase().includes(q));
+  if(hit) select(hit.id);
+});
+const reset=el("button","btn","Reset view"); reset.type="button";
+reset.addEventListener("click",()=>{ search.value=""; nodeSel.classed("match",false); select(null); fit(400); });
+tb.append(search, reset);
+
+function applyFilter(){
+  nodeSel.attr("display",d=>visible(d)?null:"none");
+  const lv=l=>visible(l.source)&&visible(l.target);
+  linkSel.attr("display",l=>lv(l)?null:"none"); elabSel.attr("display",l=>lv(l)?null:"none");
+  if(selected && !visible(byId[selected])) select(null);
+}
+
+// index
+const idx=document.getElementById("index");
+Object.entries(TYPES).forEach(([k,v])=>{
+  const items=N.filter(n=>n.type===k); if(!items.length) return;
+  const box=el("div","idx"); const h=el("h3","t-"+k); h.append(el("span","dot"), document.createTextNode(v.name)); box.append(h);
+  const ul=el("ul");
+  items.forEach(n=>{
+    const li=nodeButton(n);
+    if(n.type==="task") li.append(el("span","sc "+n.status,(n.status==="failed"?"failed":"solved")+(n.score?" "+n.score:"")));
+    li.querySelector("button").addEventListener("click",()=>canvas.scrollIntoView({behavior:"smooth",block:"nearest"}));
+    ul.append(li);
+  });
+  box.append(ul); idx.append(box);
+});
+
+new ResizeObserver(()=>fit(0)).observe(canvas);
+fit(0);
+select("W0");
+</script>
+</body>
+</html>

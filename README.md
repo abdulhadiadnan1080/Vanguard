@@ -17,9 +17,9 @@
   <img alt="How Vanguard works: consult the knowledge graph, rank advisories, narrow down, build the task, approve, validate, run the models, learn, and repeat" src="docs/assets/loop-animation-light.svg" width="100%">
 </picture>
 
-[**Explore the interactive knowledge graph →**](https://abdulhadiadnan1080.github.io/Vanguard/)
+[**Take the animated tour →**](https://abdulhadiadnan1080.github.io/Vanguard/) &nbsp;·&nbsp; [**Explore the interactive knowledge graph →**](https://abdulhadiadnan1080.github.io/Vanguard/graph.html)
 
-<a href="https://abdulhadiadnan1080.github.io/Vanguard/">
+<a href="https://abdulhadiadnan1080.github.io/Vanguard/graph.html">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/graph-overview-dark.png">
   <img alt="The knowledge graph: weaknesses, trigger conditions, evidence, tasks and task-design implications, linked by how they relate" src="docs/assets/graph-overview-light.png" width="100%">
@@ -256,7 +256,7 @@ and rank advisories with no private pipeline and no history at all.
 
 ```
 ├── main.py                  entry point: `python3 main.py --demo`, or any vanguard command
-├── docs/                    interactive knowledge graph (served by GitHub Pages) + graph.json / CSVs + images
+├── docs/                    animated tour (index.html) + interactive knowledge graph (graph.html), served by GitHub Pages
 ├── examples/                sample output of a demo run (summary JSON)
 ├── findings/                the research: failure analysis, results, weakness specs (anonymised)
 └── vanguard/                the pipeline

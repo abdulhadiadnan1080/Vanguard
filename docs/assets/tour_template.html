@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vanguard: Failure Intelligence for LLM Coding Agents</title>
+<meta name="description" content="An interactive tour of Vanguard: a self-improving knowledge graph that predicts which real-world security fixes an AI coding agent will fail, before you spend anything running it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one dark scroll story. Each chapter is a full-width band with a centred 1080px column; every animation is
+   triggered when its chapter scrolls into view and the page reads correctly with no motion at all. */
+:root {
+  color-scheme: dark;
+  --bg: #0A0F1E; --bg2: #0E1428; --panel: #121A33; --panel2: #18213F; --line: #24304F; --line2: #2F3D63;
+  --fg: #E8ECF7; --fg2: #B9C2DA; --muted: #8590AD;
+  --accent: #7C8CFF; --accent2: #A9B4FF; --amber: #FFC35A; --red: #F2657D; --green: #4CC292; --teal: #6ED3E0;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 17px; line-height: 1.6;
+       -webkit-font-smoothing: antialiased; }
+a { color: var(--accent2); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px));
+        padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+.band { padding-block: 96px; border-top: 1px solid var(--line); position: relative; }
+.band.alt { background: var(--bg2); }
+.kicker { font-family: var(--mono); font-size: 12.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+h2 { font-size: clamp(28px, 4.2vw, 44px); line-height: 1.12; letter-spacing: -.02em; margin: 10px 0 14px; font-weight: 800;
+     text-wrap: balance; }
+.lead { font-size: clamp(17px, 1.9vw, 20px); color: var(--fg2); max-width: 64ch; margin: 0 0 34px; }
+.mono { font-family: var(--mono); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
+.grid2 > * { min-width: 0; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } .band { padding-block: 72px; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+.tag { display: inline-block; font-family: var(--mono); font-size: 11.5px; padding: 2px 9px; border-radius: 99px;
+       border: 1px solid var(--line2); color: var(--fg2); }
+.chapters { position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%); z-index: 20;
+            display: flex; flex-direction: column; gap: 10px; }
+.chapters a { width: 10px; height: 10px; border-radius: 50%; background: var(--line2); display: block; position: relative; }
+.chapters a.cur { background: var(--accent); box-shadow: 0 0 0 4px rgba(124,140,255,.18); }
+.chapters a span { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 12px;
+                   color: var(--fg2); background: var(--panel); border: 1px solid var(--line); padding: 2px 8px; border-radius: 6px;
+                   opacity: 0; pointer-events: none; transition: opacity .2s; }
+.chapters a:hover span, .chapters a:focus-visible span { opacity: 1; }
+@media (max-width: 860px) { .chapters { display: none; } }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ---------- hero ---------- */
+.hero { min-height: 92vh; display: flex; align-items: center; position: relative; overflow: hidden; padding-block: 90px 70px; }
+#net { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero::after { content: ""; position: absolute; inset: 0; background:
+  radial-gradient(ellipse at 30% 45%, rgba(10,15,30,.15), rgba(10,15,30,.86) 70%),
+  linear-gradient(180deg, rgba(10,15,30,0) 60%, var(--bg)); pointer-events: none; }
+.hero .wrap { position: relative; z-index: 2; width: 100%; }
+.hero h1 { font-size: clamp(40px, 7vw, 82px); line-height: 1.02; letter-spacing: -.035em; margin: 16px 0 18px; font-weight: 800;
+           max-width: 14ch; }
+.hero h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent2), var(--teal)); -webkit-background-clip: text;
+              background-clip: text; color: transparent; }
+.hero p { font-size: clamp(18px, 2.1vw, 22px); color: var(--fg2); max-width: 46ch; margin: 0 0 30px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; max-width: 860px; }
+@media (max-width: 700px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { background: rgba(18,26,51,.78); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; backdrop-filter: blur(6px); }
+.stat b { display: block; font-size: 30px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); line-height: 1.35; display: block; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; font: 600 15px var(--sans); padding: 12px 18px; border-radius: 11px;
+       text-decoration: none; border: 1px solid var(--line2); color: var(--fg); background: var(--panel); cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #0A0F1E; }
+.scrollhint { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 2; font-size: 12px; color: var(--muted);
+              font-family: var(--mono); letter-spacing: .12em; text-transform: uppercase; animation: bob 2.4s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translate(-50%, 6px); } }
+
+/* ---------- 1 the problem ---------- */
+.tasks { display: grid; grid-template-columns: repeat(10, 1fr); gap: 7px; }
+.tk { aspect-ratio: 1; border-radius: 7px; background: var(--panel2); border: 1px solid var(--line); position: relative; }
+/* final states are the resting styles; the animations only run "from" a blank tile, so reduced motion still shows them */
+.tk.solved { background: rgba(76,194,146,.22); border-color: rgba(76,194,146,.65); }
+.tk.failed { background: rgba(242,101,125,.32); border-color: var(--red); box-shadow: 0 0 14px rgba(242,101,125,.45); }
+.on .tk { animation: tkIn .5s ease-out both; animation-delay: calc(var(--i) * 45ms); }
+@keyframes tkIn { from { background: var(--panel2); border-color: var(--line); box-shadow: none; } }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13.5px; color: var(--fg2); margin-top: 14px; }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+.meter { margin-top: 22px; }
+.meter .bar { height: 10px; border-radius: 99px; background: var(--panel2); overflow: hidden; border: 1px solid var(--line); }
+.meter .fill { height: 100%; width: 92%; background: linear-gradient(90deg, var(--amber), var(--red)); border-radius: 99px; }
+.on .meter .fill { animation: grow 3.4s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes grow { from { width: 4%; } }
+.meter .lbl { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 7px; font-family: var(--mono); }
+.points { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.points li { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; }
+.points .ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--panel2);
+              border: 1px solid var(--line); font-family: var(--mono); font-size: 13px; color: var(--accent2); }
+.points b { color: var(--fg); }
+.points span { color: var(--fg2); font-size: 15.5px; }
+
+/* ---------- 2 the discovery ---------- */
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 10px; }
+.stage svg { width: 100%; height: auto; display: block; }
+.stage text { font-family: var(--sans); }
+.replay { margin: 12px 4px 2px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+          font-size: 13px; color: var(--muted); }
+.step { opacity: .35; transition: opacity .3s, color .3s; }
+.step.now { opacity: 1; color: var(--fg); }
+.steps { display: grid; gap: 10px; margin-top: 18px; counter-reset: s; }
+.steps div { display: grid; grid-template-columns: 28px 1fr; gap: 10px; font-size: 15.5px; color: var(--fg2); }
+.steps div::before { counter-increment: s; content: counter(s); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+                     font: 600 12.5px var(--mono); background: var(--panel2); border: 1px solid var(--line2); color: var(--accent2); }
+.steps div.now { color: var(--fg); }
+.steps div.now::before { background: var(--accent); color: #0A0F1E; border-color: var(--accent); }
+.evidence { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 34px; }
+@media (max-width: 760px) { .evidence { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ev { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.ev > b { font-size: 34px; font-weight: 800; letter-spacing: -.02em; display: block; font-variant-numeric: tabular-nums; }
+.ev.r > b { color: var(--red); } .ev.g > b { color: var(--green); } .ev.a > b { color: var(--amber); }
+.ev span b { color: var(--fg); font-weight: 600; }
+.ev span { font-size: 13.5px; color: var(--fg2); line-height: 1.4; display: block; }
+.quote { margin-top: 26px; border-left: 3px solid var(--amber); padding: 6px 0 6px 16px; color: var(--fg2); font-size: 16px; }
+.quote b { color: var(--fg); font-weight: 600; }
+
+/* ---------- 3 the graph ---------- */
+.graphframe { border: 1px solid var(--line2); border-radius: 18px; overflow: hidden; background: #0e131a; box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+.graphframe iframe { width: 100%; height: min(860px, 86vh); border: 0; display: block; }
+.graphbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line);
+            background: var(--panel); font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.dots { display: flex; gap: 6px; } .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line2); display: block; }
+.legend2 { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; font-size: 13.5px; color: var(--fg2); }
+.legend2 span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--c); margin-right: 7px; }
+
+/* ---------- 4 how it works ---------- */
+.loopsvg { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 8px; }
+.loopsvg svg { width: 100%; height: auto; display: block; }
+.stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 26px; }
+@media (max-width: 900px) { .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .stages { grid-template-columns: 1fr; } }
+.stg { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; position: relative; overflow: hidden; }
+.stg .n { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+.stg h3 { margin: 4px 0 6px; font-size: 19px; }
+.stg p { margin: 0; color: var(--fg2); font-size: 14.5px; line-height: 1.5; }
+.stg .file { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.on .stg { animation: rise .6s ease-out both; animation-delay: calc(var(--i) * 140ms); }
+@keyframes rise { from { transform: translateY(18px); opacity: .2; } }
+
+/* ---------- 5 harvester ---------- */
+.pool { display: grid; grid-template-columns: repeat(24, 1fr); gap: 4px; }
+.pl { aspect-ratio: 1; border-radius: 3px; background: rgba(124,140,255,.34); }
+.on .pl { animation: plIn .4s ease-out both; animation-delay: calc(var(--i) * 6ms); }
+.pl.out { background: var(--panel2); opacity: .55; }
+.pl.top { background: var(--amber); box-shadow: 0 0 12px rgba(255,195,90,.8); }
+.on .pl.out { animation: plIn .4s ease-out both, plOut .6s ease-in both; animation-delay: calc(var(--i) * 6ms), calc(1.6s + var(--i) * 3ms); }
+.on .pl.top { animation: plIn .4s ease-out both, plTop .8s ease-out both; animation-delay: calc(var(--i) * 6ms), 2.8s; }
+@keyframes plIn { from { transform: scale(.2); opacity: 0; } }
+@keyframes plOut { from { background: rgba(124,140,255,.34); opacity: 1; } }
+@keyframes plTop { from { background: rgba(124,140,255,.34); box-shadow: none; } }
+.funnel { display: grid; gap: 8px; margin-top: 18px; }
+.fn { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
+.fn .b { height: 32px; border-radius: 8px; background: linear-gradient(90deg, rgba(124,140,255,.35), rgba(124,140,255,.12));
+         border: 1px solid var(--line2); display: flex; align-items: center; padding: 0 12px; font-size: 13.5px; color: var(--fg);
+         width: var(--w); white-space: nowrap; overflow: hidden; }
+.on .fn .b { animation: fnIn .9s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i) * 260ms); }
+@keyframes fnIn { from { clip-path: inset(0 100% 0 0); } }
+.fn .v { font-family: var(--mono); font-size: 14px; color: var(--fg2); font-variant-numeric: tabular-nums; min-width: 6ch; text-align: right; }
+.score { display: grid; gap: 10px; }
+.sc { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.sc .t { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; margin-bottom: 8px; }
+.sc .t span:last-child { font-family: var(--mono); color: var(--muted); font-size: 12.5px; }
+.sc .row { display: grid; grid-template-columns: 70px 1fr 42px; gap: 10px; align-items: center; font-size: 12.5px; color: var(--fg2); }
+.sc .row + .row { margin-top: 5px; }
+.sc .track { height: 8px; border-radius: 99px; background: var(--panel2); overflow: hidden; }
+.sc .track i { display: block; height: 100%; width: var(--p); border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--red)); }
+.on .sc .track i { animation: grow2 1.4s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(.4s + var(--i) * 200ms); }
+@keyframes grow2 { from { width: 0; } }
+.sc .why { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.note { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+
+/* ---------- 6 learning ---------- */
+.brier { display: grid; gap: 16px; }
+.br { display: grid; grid-template-columns: 170px 1fr 64px; gap: 14px; align-items: center; font-size: 15px; }
+.br .track { height: 26px; background: var(--panel2); border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+.br .track i { display: block; height: 100%; width: var(--w); background: var(--c); border-radius: 8px; }
+.on .br .track i { animation: grow2 1.6s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i) * 300ms); }
+.br .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 16px; text-align: right; }
+.br.best { font-weight: 700; } .br.best .v { color: var(--green); }
+@media (max-width: 600px) { .br { grid-template-columns: 1fr 56px; } .br .track { grid-column: 1 / -1; grid-row: 2; } }
+.loopfacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 26px; }
+@media (max-width: 760px) { .loopfacts { grid-template-columns: 1fr; } }
+.lf { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; font-size: 14.5px; color: var(--fg2); }
+.lf b { color: var(--fg); display: block; font-size: 16px; margin-bottom: 4px; }
+
+/* ---------- 7 judge ---------- */
+.checks { display: grid; gap: 9px; }
+.ck { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 12px; padding: 11px 14px; font-size: 15px; }
+.ck .m { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-weight: 700;
+         background: var(--panel2); color: var(--muted); border: 1px solid var(--line2); }
+.ck .r { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.on .ck .m { animation: tick .45s ease-out both; animation-delay: calc(.3s + var(--i) * 380ms); }
+@keyframes tick { from { transform: scale(.4); background: var(--panel2); color: var(--muted); } 60% { transform: scale(1.18); } }
+.ck.ok .m { background: rgba(76,194,146,.18); color: var(--green); border-color: rgba(76,194,146,.6); }
+.ck.drop .m { background: rgba(242,101,125,.18); color: var(--red); border-color: rgba(242,101,125,.6); }
+.ck.half .m { background: rgba(255,195,90,.16); color: var(--amber); border-color: rgba(255,195,90,.6); }
+.gates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.gate { border: 1px dashed var(--amber); border-radius: 14px; padding: 14px 16px; background: rgba(255,195,90,.06); }
+.gate b { color: var(--amber); display: block; font-size: 15px; }
+.gate span { font-size: 14px; color: var(--fg2); }
+.money { margin-top: 14px; display: grid; gap: 8px; }
+.money div { display: flex; justify-content: space-between; gap: 12px; font-size: 14.5px; padding: 9px 14px; border-radius: 10px; background: var(--panel);
+             border: 1px solid var(--line); }
+.money .free { color: var(--green); font-family: var(--mono); font-size: 12.5px; }
+.money .paid { color: var(--amber); font-family: var(--mono); font-size: 12.5px; }
+
+/* ---------- 8 trust + 9 try ---------- */
+.trust { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 860px) { .trust { grid-template-columns: 1fr; } }
+.tr { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.tr b { display: block; font-size: 16.5px; margin-bottom: 6px; }
+.tr span { color: var(--fg2); font-size: 14.5px; }
+.term { background: #060912; border: 1px solid var(--line2); border-radius: 14px; overflow: hidden; }
+.term .top { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line);
+             font-size: 12px; color: var(--muted); font-family: var(--mono); gap: 10px; }
+.term pre { margin: 0; padding: 16px 18px; font-family: var(--mono); font-size: 13.5px; line-height: 1.75; color: #C8D0E8; overflow-x: auto; }
+.term .p { color: var(--green); } .term .c { color: var(--muted); } .term .h { color: var(--accent2); } .term .y { color: var(--amber); }
+.copy { font: 600 12px var(--sans); background: var(--panel2); color: var(--fg); border: 1px solid var(--line2); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+footer.end { padding-block: 46px 60px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+footer.end .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<nav class="chapters" aria-label="Chapters">
+  <a href="#top"><span>Start</span></a><a href="#problem"><span>The problem</span></a><a href="#discovery"><span>The discovery</span></a>
+  <a href="#graph"><span>Knowledge graph</span></a><a href="#how"><span>How it works</span></a><a href="#harvest"><span>Harvester</span></a>
+  <a href="#learn"><span>It learns</span></a><a href="#judge"><span>Judge</span></a><a href="#try"><span>Try it</span></a>
+</nav>
+
+<!-- ============================== HERO ============================== -->
+<section class="hero" id="top">
+  <canvas id="net" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <div class="kicker">Vanguard · failure intelligence for LLM coding agents</div>
+    <h1>Know which tasks an AI <em>will fail</em> before you pay to run them.</h1>
+    <p>Vanguard is a self-improving knowledge graph. It studies why coding agents fail at real security fixes, ranks
+      thousands of real vulnerabilities by how likely each one is to beat a model, and builds the winners into fair
+      benchmark tasks.</p>
+    <div class="stats">
+      <div class="stat"><b data-count="1928" data-sep>0</b><span>real advisories ranked in about 12 seconds, at no cost</span></div>
+      <div class="stat"><b data-count="92">0</b><span>findings in the knowledge graph, linked by 125 relations</span></div>
+      <div class="stat"><b data-count="0" data-final="0">0</b><span>dependencies: pure Python standard library</span></div>
+      <div class="stat"><b data-count="30">0</b><span>tests, including the full loop end to end</span></div>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="#problem">Take the 3-minute tour ↓</a>
+      <a class="btn" href="#graph">Jump to the knowledge graph</a>
+      <a class="btn" href="https://github.com/abdulhadiadnan1080/Vanguard">GitHub</a>
+    </div>
+  </div>
+  <div class="scrollhint">scroll</div>
+</section>
+
+<!-- ============================== 1 PROBLEM ============================== -->
+<section class="band" id="problem" data-anim>
+  <div class="wrap grid2">
+    <div>
+      <div class="kicker">01 · The problem</div>
+      <h2>Most benchmark tasks are wasted money.</h2>
+      <p class="lead">To test an AI coding agent you need tasks it actually <b>fails</b>. Today the only way to find one
+        is to build it, check it, pay for the model runs, and hope. Most of the time the agent solves it, and the work
+        teaches you nothing.</p>
+      <ul class="points">
+        <li><span class="ic">01</span><span><b>Building a task is slow.</b> A real vulnerability, a Docker image, hidden tests, a fairness review.</span></li>
+        <li><span class="ic">02</span><span><b>Running it costs money.</b> Every attempt by every model is a paid API call.</span></li>
+        <li><span class="ic">03</span><span><b>Most get solved.</b> A strong agent fixes the obvious vulnerability, and the task is thrown away.</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="tasks" id="taskgrid" aria-label="Illustration: 60 candidate tasks, most solved, few failed"></div>
+      <div class="legend"><span><i style="background:rgba(76,194,146,.5)"></i>solved: money spent, nothing learned</span>
+        <span><i style="background:var(--red)"></i>failed: the tasks you wanted</span></div>
+      <div class="meter"><div class="bar"><div class="fill"></div></div>
+        <div class="lbl"><span>spend on tasks that get solved</span><span>illustration</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 2 DISCOVERY ============================== -->
+<section class="band alt" id="discovery" data-anim>
+  <div class="wrap">
+    <div class="kicker">02 · The discovery</div>
+    <h2>We found exactly <span style="color:var(--amber)">how</span> a strong model fails, and reproduced it on demand.</h2>
+    <p class="lead">Some security fixes need <b>two</b> changes: the <b>check</b> that decides "allowed or not", and the
+      <b>data producer</b> that saves and reloads the data that check relies on. Watch what the model does.</p>
+    <div class="grid2" style="align-items:start">
+      <div class="stage">
+        <svg id="story" viewBox="0 0 560 360" role="img" aria-label="Animated replay: the model fixes the check, notices the data producer, dismisses it with an assumption, and the attack slips through the producer path">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,1 L9,5 L0,9z" fill="#2F3D63"/></marker>
+            <filter id="gl"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+          <!-- request entering -->
+          <text x="22" y="40" fill="#8590AD" font-size="12" font-family="JetBrains Mono, monospace">attacker's request</text>
+          <!-- path A: direct to check -->
+          <path d="M40 70 H 200" stroke="#2F3D63" stroke-width="2" marker-end="url(#ah)" fill="none"/>
+          <!-- path B: via storage -> producer -> check -->
+          <path d="M40 70 V 250 H 200" stroke="#2F3D63" stroke-width="2" marker-end="url(#ah)" fill="none"/>
+          <circle cx="40" cy="70" r="7" fill="#F2657D"/>
+          <!-- check box -->
+          <g id="checkBox">
+            <rect x="204" y="44" width="150" height="54" rx="10" fill="#18213F" stroke="#2F3D63" stroke-width="1.5"/>
+            <rect class="checkFix" x="204" y="44" width="150" height="54" rx="10" fill="rgba(76,194,146,.16)" stroke="#4CC292" stroke-width="2" opacity="0"/>
+            <text x="279" y="67" text-anchor="middle" fill="#E8ECF7" font-size="14" font-weight="600">Check</text>
+            <text x="279" y="85" text-anchor="middle" fill="#8590AD" font-size="11">decides "allowed?"</text>
+          </g>
+          <!-- producer box -->
+          <g>
+            <rect x="204" y="224" width="150" height="54" rx="10" fill="#18213F" stroke="#2F3D63" stroke-width="1.5"/>
+            <rect class="prodWarn" x="204" y="224" width="150" height="54" rx="10" fill="none" stroke="#FFC35A" stroke-width="2" stroke-dasharray="5 4" opacity="0"/>
+            <text x="279" y="247" text-anchor="middle" fill="#E8ECF7" font-size="14" font-weight="600">Data producer</text>
+            <text x="279" y="265" text-anchor="middle" fill="#8590AD" font-size="11">saves &amp; reloads data</text>
+          </g>
+          <!-- producer feeds check -->
+          <path d="M354 251 H 400 V 71 H 358" stroke="#2F3D63" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+          <text x="410" y="165" fill="#8590AD" font-size="11" font-family="JetBrains Mono, monospace">reloaded later,</text>
+          <text x="410" y="180" fill="#8590AD" font-size="11" font-family="JetBrains Mono, monospace">security field lost</text>
+          <!-- outcome -->
+          <g class="leak" opacity="0">
+            <rect x="420" y="296" width="126" height="40" rx="10" fill="rgba(242,101,125,.18)" stroke="#F2657D" stroke-width="1.5"/>
+            <text x="483" y="321" text-anchor="middle" fill="#F2657D" font-size="13" font-weight="700">secret leaked</text>
+          </g>
+          <g class="blocked" opacity="0">
+            <text x="279" y="30" text-anchor="middle" fill="#4CC292" font-size="12" font-weight="600">✓ direct attack blocked</text>
+          </g>
+          <!-- the model -->
+          <g class="agent">
+            <circle r="17" fill="#7C8CFF" filter="url(#gl)"/>
+            <text text-anchor="middle" y="5" fill="#0A0F1E" font-size="14" font-weight="800">A</text>
+          </g>
+          <!-- thought bubble -->
+          <g class="thought" opacity="0">
+            <rect x="34" y="118" width="250" height="64" rx="12" fill="#121A33" stroke="#FFC35A" stroke-width="1.5"/>
+            <text x="50" y="142" fill="#FFC35A" font-size="12.5" font-weight="600">"The schema drops that field…</text>
+            <text x="50" y="162" fill="#E8ECF7" font-size="12.5">but the app keeps it when saving."</text>
+          </g>
+          <g class="done" opacity="0">
+            <rect x="34" y="296" width="172" height="40" rx="10" fill="#121A33" stroke="#4CC292" stroke-width="1.5"/>
+            <text x="120" y="321" text-anchor="middle" fill="#4CC292" font-size="12.5" font-weight="600">tests pass → "done"</text>
+          </g>
+          <!-- the attack sneaking through the producer path -->
+          <circle class="attack" r="7" fill="#F2657D" filter="url(#gl)" opacity="0"/>
+        </svg>
+        <div class="replay"><span id="storyCaption">Press play, or scroll here to start</span>
+          <button class="copy" id="replay" type="button">↻ Replay</button></div>
+      </div>
+      <div>
+        <div class="steps" id="storySteps">
+          <div data-t="0"><span>It reads the report and goes straight to the <b>check</b>.</span></div>
+          <div data-t="1"><span>It fixes the check correctly. Every single time.</span></div>
+          <div data-t="2"><span>It <b>notices</b> the data producer drops the security field.</span></div>
+          <div data-t="3"><span>It dismisses it with an assumption it never tests.</span></div>
+          <div data-t="4"><span>The existing tests pass, so it stops.</span></div>
+          <div data-t="5"><span>The attack still gets through the save-and-reload path.</span></div>
+        </div>
+        <div class="quote">Real quote from a failed run: <b>"If parsed, the field is unknown and removed! This is critical."</b>
+          A few sentences later: <b>"Fine. Gate done."</b></div>
+      </div>
+    </div>
+    <div class="evidence">
+      <div class="ev r"><b data-count="8" data-suffix=" / 8">0</b><span>tasks in this shape failed on <b>every</b> run, including pass@3 = 0 on a real, unmodified codebase</span></div>
+      <div class="ev g"><b data-count="6" data-suffix=" / 6">0</b><span>explains the bug correctly when asked directly: it is <b>not a knowledge gap</b></span></div>
+      <div class="ev a"><b data-count="0" data-final="0" data-suffix=" / 6">0</b><span>solved after generic prompts like "check your assumptions": reminders don't work</span></div>
+      <div class="ev g"><b data-count="3" data-suffix=" / 3">0</b><span>solved once one failing test exposes the second path: it follows <b>evidence</b></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 3 GRAPH ============================== -->
+<section class="band" id="graph" data-anim>
+  <div class="wrap">
+    <div class="kicker">03 · The knowledge graph</div>
+    <h2>Every finding, linked to the evidence behind it.</h2>
+    <p class="lead">This is the live graph. Each dot is a finding: a weakness, the conditions that trigger it, the
+      reasons the model gave, the experiments that isolated the cause, and the tasks that expose it. <b>Click any dot</b>
+      to light up what it connects to.</p>
+    <div class="graphframe">
+      <div class="graphbar"><div class="dots"><i></i><i></i><i></i></div><span>interactive · drag to pan · scroll to zoom · click a node</span>
+        <a href="graph.html" target="_blank" rel="noopener">open full screen ↗</a></div>
+      <iframe title="Vanguard knowledge graph" loading="lazy" srcdoc="{{GRAPH_SRCDOC}}"></iframe>
+    </div>
+    <div class="legend2">
+      <span style="--c:#f06a7e">weakness</span><span style="--c:#e3a54a">trigger condition</span><span style="--c:#ab88ef">evidence</span>
+      <span style="--c:#d88aca">reason the model gave</span><span style="--c:#68a6ea">task (ring: solved / failed)</span>
+      <span style="--c:#4cc292">strength</span><span style="--c:#9cb0c7">task-design implication</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 4 HOW ============================== -->
+<section class="band alt" id="how" data-anim>
+  <div class="wrap">
+    <div class="kicker">04 · How it works</div>
+    <h2>A loop that gets smarter every time it runs.</h2>
+    <p class="lead">Vanguard turns that research into a machine. It ranks real vulnerabilities, builds the most promising
+      ones into tasks, checks they are fair, runs the models, and feeds every result back into the graph.</p>
+    <div class="loopsvg">{{LOOP_SVG}}</div>
+    <div class="stages">
+      <div class="stg" style="--i:0"><div class="n">STAGE 1</div><h3>🧠 Knowledge Graph</h3><p>Remembers every task, run and outcome, and learns which weaknesses beat which model.</p><div class="file">knowledge_graph.py · learner.py</div></div>
+      <div class="stg" style="--i:1"><div class="n">STAGE 2</div><h3>🔎 Harvester</h3><p>Pulls real security fixes from GitHub and scores each one's chance of beating each model.</p><div class="file">harvester.py · rank</div></div>
+      <div class="stg" style="--i:2"><div class="n">STAGE 3</div><h3>🛠️ Synthesizer</h3><p>An AI agent turns the best candidates into sealed Docker tasks. A person approves each one.</p><div class="file">loop.py</div></div>
+      <div class="stg" style="--i:3"><div class="n">STAGE 4</div><h3>⚖️ Judge</h3><p>Proves each task is fair, runs the models behind budgets, and sends results back.</p><div class="file">validate.py · collect</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 5 HARVEST ============================== -->
+<section class="band" id="harvest" data-anim>
+  <div class="wrap">
+    <div class="kicker">05 · Harvester</div>
+    <h2>From 1,928 real vulnerabilities to the few worth building.</h2>
+    <p class="lead">It reads every fix line by line, the way a reviewer would: where is the check? Is there a separate
+      piece of code that saves or reloads the data? Does a security field get dropped on the way? Each answer moves
+      the score.</p>
+    <div class="grid2" style="align-items:start">
+      <div>
+        <div class="card"><div class="pool" id="pool" aria-label="Illustration: the advisory pool, filtered down to a shortlist"></div></div>
+        <div class="funnel">
+          <div class="fn"><div class="b" style="--w:100%;--i:0">reviewed advisories with a fix commit</div><div class="v">1,932</div></div>
+          <div class="fn"><div class="b" style="--w:99%;--i:1">fix patch read and scored</div><div class="v">1,928</div></div>
+          <div class="fn"><div class="b" style="--w:82%;--i:2">buildable, not already built, one per fix</div><div class="v">1,590</div></div>
+          <div class="fn"><div class="b" style="--w:24%;--i:3">shortlist</div><div class="v">top 3</div></div>
+        </div>
+      </div>
+      <div class="score">
+        <div class="sc"><div class="t"><span><b>Candidate 1</b> · Python web app</span><span>check + data producer</span></div>
+          <div class="row"><span>Model A</span><div class="track"><i style="--p:94%;--i:0"></i></div><span class="mono">0.94</span></div>
+          <div class="row"><span>Model B</span><div class="track"><i style="--p:66%;--i:1"></i></div><span class="mono">0.66</span></div>
+          <div class="why"><span class="tag">producer drops a security field</span><span class="tag">save/load boundary</span></div></div>
+        <div class="sc"><div class="t"><span><b>Candidate 2</b> · Go admin UI</span><span>check + data producer</span></div>
+          <div class="row"><span>Model A</span><div class="track"><i style="--p:91%;--i:2"></i></div><span class="mono">0.91</span></div>
+          <div class="row"><span>Model B</span><div class="track"><i style="--p:57%;--i:3"></i></div><span class="mono">0.57</span></div>
+          <div class="why"><span class="tag">shared field: role</span><span class="tag">check doesn't call the producer</span></div></div>
+        <div class="sc"><div class="t"><span><b>Candidate 3</b> · JS library</span><span>single file</span></div>
+          <div class="row"><span>Model A</span><div class="track"><i style="--p:18%;--i:4"></i></div><span class="mono">0.18</span></div>
+          <div class="row"><span>Model B</span><div class="track"><i style="--p:12%;--i:5"></i></div><span class="mono">0.12</span></div>
+          <div class="why"><span class="tag">one missing check: models solve these</span></div></div>
+        <div class="note">Each bar is the predicted chance that a model fails one attempt. Candidates and scores here are
+          illustrative; the funnel counts are from a real run.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 6 LEARN ============================== -->
+<section class="band alt" id="learn" data-anim>
+  <div class="wrap">
+    <div class="kicker">06 · It learns</div>
+    <h2>Every result makes the next prediction better.</h2>
+    <p class="lead">We test the predictor the hard way: hide an entire repository, train on the rest, and score its
+      predictions on the hidden one. The Brier score measures how far predictions land from reality (lower is better).</p>
+    <div class="brier">
+      <div class="br" style="--i:0"><span>Overall fail rate</span><div class="track"><i style="--w:98.5%;--c:#5A6587"></i></div><span class="v">0.394</span></div>
+      <div class="br" style="--i:1"><span>Expert-set weights</span><div class="track"><i style="--w:80%;--c:#8590AD"></i></div><span class="v">0.320</span></div>
+      <div class="br best" style="--i:2"><span>Vanguard, learned</span><div class="track"><i style="--w:57.5%;--c:linear-gradient(90deg,#4CC292,#6ED3E0)"></i></div><span class="v">0.230</span></div>
+    </div>
+    <div class="loopfacts">
+      <div class="lf"><b>Forecasts are frozen</b>Every prediction is saved before a task is built, then scored against what really happened.</div>
+      <div class="lf"><b>Honest about evidence</b>Every score says how many tasks and repositories back it. One repository is a hypothesis, not a fact.</div>
+      <div class="lf"><b>Starts useful on day one</b>With no history it uses expert weights, then learns from each graded task.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 7 JUDGE ============================== -->
+<section class="band" id="judge" data-anim>
+  <div class="wrap grid2" style="align-items:start">
+    <div>
+      <div class="kicker">07 · The Judge</div>
+      <h2>No unfair task gets through. No money moves without you.</h2>
+      <p class="lead">A task is only useful if failing it means the model really failed. Before any model runs, every
+        task has to prove it is fair, automatically.</p>
+      <div class="gates">
+        <div class="gate"><b>Gate 1</b><span>You approve each built task before it is validated.</span></div>
+        <div class="gate"><b>Gate 2</b><span>You approve more attempts only after both models fail round one.</span></div>
+      </div>
+      <div class="money">
+        <div><span>Rank, graph, learn, validate</span><span class="free">FREE</span></div>
+        <div><span>AI build agent, model runs</span><span class="paid">BUDGETED + GATED</span></div>
+        <div><span>A model solves it</span><span class="free">STOPS SPENDING</span></div>
+      </div>
+    </div>
+    <div class="checks">
+      <div class="ck ok" style="--i:0"><span class="m">✓</span><span>The real fix scores 1.0, twice</span><span class="r">oracle ×2</span></div>
+      <div class="ck ok" style="--i:1"><span class="m">✓</span><span>No fix scores 0, legitimate use still works</span><span class="r">nop</span></div>
+      <div class="ck half" style="--i:2"><span class="m">½</span><span>A half fix lands in between</span><span class="r">check-only</span></div>
+      <div class="ck ok" style="--i:3"><span class="m">✓</span><span>No git history, advisory or hidden tests leak into the image</span><span class="r">leak scan</span></div>
+      <div class="ck ok" style="--i:4"><span class="m">✓</span><span>The report describes impact only, no fix location</span><span class="r">static</span></div>
+      <div class="ck drop" style="--i:5"><span class="m">✗</span><span>A half fix that closes every attack? <b>Task dropped.</b></span><span class="r">reproduced on real Docker</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 8 TRUST + TRY ============================== -->
+<section class="band alt" id="try" data-anim>
+  <div class="wrap">
+    <div class="kicker">08 · Try it</div>
+    <h2>See the whole pipeline run in about a second.</h2>
+    <p class="lead">One command, no install, no API keys, no Docker. The demo runs the real code through all four stages
+      on synthetic data and ends with an accepted benchmark task.</p>
+    <div class="term">
+      <div class="top"><span>terminal</span><button class="copy" id="copy" type="button">Copy command</button></div>
+<pre id="cmd"><span class="p">$</span> git clone https://github.com/abdulhadiadnan1080/Vanguard.git && cd Vanguard && python3 main.py --demo
+<span class="h">[1/4] Knowledge graph</span>  <span class="c">60 graded tasks, 246 trials · held-out Brier 0.146 → 0.063 → 0.050</span>
+<span class="h">[2/4] Harvester</span>        <span class="c">40 candidates scored for Model A and Model B</span>
+<span class="h">[3/4] Synthesizer</span>      <span class="c">agent builds 1 task, rejects 1 at triage · gate 1 approved</span>
+<span class="h">[4/4] Judge</span>            <span class="c">fair ✓ · round 1 failed · gate 2 · round 2 failed</span>
+<span class="y">Done.</span>  GHSA-demo-0016 accepted <span class="c">(failed by both models on every attempt)</span></pre>
+    </div>
+    <div class="trust" style="margin-top:22px">
+      <div class="tr"><b>Pure standard library</b><span>Python 3.9+, nothing to install. Graph, statistics and solver are written from scratch.</span></div>
+      <div class="tr"><b>Works from a fresh clone</b><span>Pulls real advisories from GitHub and ranks them with nothing but Python.</span></div>
+      <div class="tr"><b>30 tests, fully isolated</b><span>Including the complete loop, a crashed run, a rejected build and a model that wins.</span></div>
+    </div>
+    <div class="cta" style="margin-top:28px">
+      <a class="btn primary" href="https://github.com/abdulhadiadnan1080/Vanguard">View on GitHub</a>
+      <a class="btn" href="graph.html">Open the knowledge graph</a>
+    </div>
+  </div>
+</section>
+
+<footer class="end"><div class="wrap"><span>Vanguard · built by <b style="color:var(--fg)">Abdul Hadi Adnan</b></span>
+  <span>Models are anonymised as Model A and Model B.</span></div></footer>
+
+<script>
+(function () {
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- hero: a living knowledge graph ---------- */
+  var cv = document.getElementById("net"), ctx = cv.getContext("2d"), W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var COLORS = ["#f06a7e", "#e3a54a", "#68a6ea", "#ab88ef", "#4cc292", "#78c0cc", "#d88aca", "#9cb0c7"];
+  var nodes = [], pulses = [], rnd = (function (s) { return function () { s = (s * 16807) % 2147483647; return s / 2147483647; }; })(7);
+  function size() {
+    W = cv.clientWidth; H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function init() {
+    size(); nodes = [];
+    var n = Math.round(Math.min(110, Math.max(46, W * H / 15000)));
+    for (var i = 0; i < n; i++) nodes.push({ x: rnd() * W, y: rnd() * H, vx: (rnd() - .5) * .25, vy: (rnd() - .5) * .25,
+      r: 2 + rnd() * 3.2, c: COLORS[i % COLORS.length], big: rnd() < .08 });
+  }
+  function draw(move) {
+    ctx.clearRect(0, 0, W, H);
+    var LINK = Math.min(170, W / 7);
+    for (var i = 0; i < nodes.length; i++) {
+      var a = nodes[i];
+      if (move) { a.x += a.vx; a.y += a.vy; if (a.x < 0 || a.x > W) a.vx *= -1; if (a.y < 0 || a.y > H) a.vy *= -1; }
+      for (var j = i + 1; j < nodes.length; j++) {
+        var b = nodes[j], dx = a.x - b.x, dy = a.y - b.y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d < LINK) {
+          ctx.strokeStyle = "rgba(124,140,255," + (0.22 * (1 - d / LINK)).toFixed(3) + ")"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+          if (move && rnd() < 0.0009) pulses.push({ a: a, b: b, t: 0 });
+        }
+      }
+    }
+    for (var k = pulses.length - 1; k >= 0; k--) {
+      var p = pulses[k]; p.t += 0.018; if (p.t >= 1) { pulses.splice(k, 1); continue; }
+      var px = p.a.x + (p.b.x - p.a.x) * p.t, py = p.a.y + (p.b.y - p.a.y) * p.t;
+      ctx.fillStyle = "rgba(255,195,90," + (1 - p.t).toFixed(2) + ")"; ctx.beginPath(); ctx.arc(px, py, 2.6, 0, 6.283); ctx.fill();
+    }
+    for (var m = 0; m < nodes.length; m++) {
+      var q = nodes[m];
+      if (q.big) { ctx.fillStyle = q.c + "33"; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * 3.2, 0, 6.283); ctx.fill(); }
+      ctx.fillStyle = q.c; ctx.beginPath(); ctx.arc(q.x, q.y, q.big ? q.r * 1.6 : q.r, 0, 6.283); ctx.fill();
+    }
+  }
+  init(); draw(false);
+  var heroVisible = true;
+  if (!reduce) (function loop() { if (heroVisible) draw(true); requestAnimationFrame(loop); })();
+  window.addEventListener("resize", function () { init(); draw(false); });
+
+  /* ---------- count-ups ---------- */
+  function countUp(el) {
+    var target = +el.dataset.count, suffix = el.dataset.suffix || "", sep = el.hasAttribute("data-sep");
+    var fmt = function (v) { v = Math.round(v); return (sep ? v.toLocaleString("en-US") : v) + suffix; };
+    if (reduce || target === 0) { el.textContent = fmt(target); return; }
+    var t0 = null;
+    (function step(ts) { t0 = t0 || ts; var k = Math.min(1, (ts - t0) / 1400); el.textContent = fmt(target * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(step); })(performance.now());
+  }
+  /* without JS or before scrolling, numbers already show their final values */
+  document.querySelectorAll("[data-count]").forEach(function (el) {
+    var v = +el.dataset.count; el.textContent = (el.hasAttribute("data-sep") ? v.toLocaleString("en-US") : v) + (el.dataset.suffix || "");
+  });
+
+  /* ---------- illustrations built from data ---------- */
+  var tg = document.getElementById("taskgrid");
+  for (var i = 0; i < 60; i++) { var d = document.createElement("div"); var failed = [7, 23, 41, 52].indexOf(i) >= 0;
+    d.className = "tk " + (failed ? "failed" : "solved"); d.style.setProperty("--i", i); tg.appendChild(d); }
+  var pool = document.getElementById("pool"), tops = [37, 101, 158];
+  for (var j = 0; j < 240; j++) { var c = document.createElement("div");
+    c.className = "pl " + (tops.indexOf(j) >= 0 ? "top" : (j % 6 === 0 || j % 11 === 0 || j % 7 === 0 ? "" : "out"));
+    c.style.setProperty("--i", j); pool.appendChild(c); }
+
+  /* ---------- the discovery replay (scripted timeline) ---------- */
+  var svg = document.getElementById("story"), agent = svg.querySelector(".agent"), attack = svg.querySelector(".attack");
+  var steps = document.querySelectorAll("#storySteps div"), cap = document.getElementById("storyCaption");
+  var show = function (sel, on) { var el = svg.querySelector(sel); el.style.transition = "opacity .5s"; el.setAttribute("opacity", on ? 1 : 0); };
+  function moveTo(el, x, y, ms) { el.style.transition = "transform " + ms + "ms cubic-bezier(.4,0,.2,1)"; el.setAttribute("transform", "translate(" + x + "," + y + ")"); }
+  var timers = [];
+  function later(ms, fn) { timers.push(setTimeout(fn, ms)); }
+  function setStep(k, text) { steps.forEach(function (s, n) { s.classList.toggle("now", n === k); }); cap.textContent = text; }
+  function finalFrame() {
+    moveTo(agent, 228, 316, 0); show(".checkFix", 1); show(".blocked", 1); show(".prodWarn", 1); show(".thought", 1);
+    show(".done", 1); show(".leak", 1); attack.setAttribute("opacity", 1); attack.setAttribute("transform", "translate(483,296)");
+    setStep(5, "The attack still gets through the save-and-reload path.");
+  }
+  function play() {
+    timers.forEach(clearTimeout); timers = [];
+    if (reduce) { finalFrame(); return; }
+    ["checkFix", "blocked", "prodWarn", "thought", "done", "leak"].forEach(function (c) { show("." + c, 0); });
+    attack.setAttribute("opacity", 0); attack.style.transition = "none"; attack.setAttribute("transform", "translate(40,70)");
+    agent.style.transition = "none"; agent.setAttribute("transform", "translate(40,70)");
+    setStep(0, "Reading the report…");
+    later(300, function () { moveTo(agent, 200, 71, 1300); });
+    later(1700, function () { setStep(1, "Fixing the check…"); show(".checkFix", 1); });
+    later(2500, function () { show(".blocked", 1); });
+    later(3400, function () { setStep(2, "Noticing the data producer…"); moveTo(agent, 190, 250, 1200); });
+    later(4400, function () { show(".prodWarn", 1); });
+    later(5200, function () { setStep(3, "Dismissing it with an assumption…"); show(".thought", 1); });
+    later(7600, function () { setStep(4, "Existing tests pass, so it stops."); show(".thought", 0); moveTo(agent, 228, 316, 900); });
+    later(8400, function () { show(".done", 1); });
+    later(9300, function () { setStep(5, "Meanwhile, the attack takes the other path…");
+      attack.setAttribute("opacity", 1); attack.style.transition = "transform 2600ms linear";
+      attack.setAttribute("transform", "translate(40,250)"); });
+    later(10000, function () { attack.style.transition = "transform 1200ms linear"; attack.setAttribute("transform", "translate(354,251)"); });
+    later(11300, function () { attack.style.transition = "transform 1300ms linear"; attack.setAttribute("transform", "translate(483,296)"); });
+    later(12500, function () { show(".leak", 1); cap.textContent = "The check was fixed. The secret still leaked."; });
+  }
+  agent.setAttribute("transform", "translate(40,70)");
+  finalFrame();  /* complete at rest: the whole story is visible before any animation runs */
+  document.getElementById("replay").addEventListener("click", play);
+
+  /* ---------- reveal chapters as they scroll in ---------- */
+  var played = {};
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      var sec = e.target;
+      if (sec.id === "top") return;
+      if (!played[sec.id]) {
+        played[sec.id] = true; sec.classList.add("on");
+        sec.querySelectorAll("[data-count]").forEach(countUp);
+        if (sec.id === "discovery") play();
+      }
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll("[data-anim]").forEach(function (s) { io.observe(s); });
+  document.querySelectorAll(".hero [data-count]").forEach(countUp);
+  new IntersectionObserver(function (es) { heroVisible = es[0].isIntersecting; }).observe(document.getElementById("top"));
+
+  /* ---------- chapter dots ---------- */
+  var dots = document.querySelectorAll(".chapters a"), ids = Array.prototype.map.call(dots, function (a) { return a.getAttribute("href").slice(1); });
+  var cio = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { var k = ids.indexOf(e.target.id);
+    dots.forEach(function (d, n) { d.classList.toggle("cur", n === k); }); } }); }, { rootMargin: "-45% 0px -50% 0px" });
+  ids.forEach(function (id) { var el = document.getElementById(id); if (el) cio.observe(el); });
+
+  /* ---------- copy ---------- */
+  document.getElementById("copy").addEventListener("click", function () {
+    var btn = this, text = "git clone https://github.com/abdulhadiadnan1080/Vanguard.git && cd Vanguard && python3 main.py --demo";
+    var done = function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy command"; }, 1600); };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () { selectCmd(); });
+    else selectCmd();
+    function selectCmd() { var r = document.createRange(); r.selectNodeContents(document.getElementById("cmd"));
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = "Press ⌘C"; }
+  });
+})();
+</script>
+</body>
+</html>

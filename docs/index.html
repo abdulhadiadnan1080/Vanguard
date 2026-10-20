@@ -3,31 +3,424 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
-<title>Agent Failure Map</title>
+<title>Vanguard: Failure Intelligence for LLM Coding Agents</title>
+<meta name="description" content="An interactive tour of Vanguard: a self-improving knowledge graph that predicts which real-world security fixes an AI coding agent will fail, before you spend anything running it.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+/* Layout: one dark scroll story. Each chapter is a full-width band with a centred 1080px column; every animation is
+   triggered when its chapter scrolls into view and the page reads correctly with no motion at all. */
+:root {
+  color-scheme: dark;
+  --bg: #0A0F1E; --bg2: #0E1428; --panel: #121A33; --panel2: #18213F; --line: #24304F; --line2: #2F3D63;
+  --fg: #E8ECF7; --fg2: #B9C2DA; --muted: #8590AD;
+  --accent: #7C8CFF; --accent2: #A9B4FF; --amber: #FFC35A; --red: #F2657D; --green: #4CC292; --teal: #6ED3E0;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 17px; line-height: 1.6;
+       -webkit-font-smoothing: antialiased; }
+a { color: var(--accent2); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px));
+        padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+.band { padding-block: 96px; border-top: 1px solid var(--line); position: relative; }
+.band.alt { background: var(--bg2); }
+.kicker { font-family: var(--mono); font-size: 12.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+h2 { font-size: clamp(28px, 4.2vw, 44px); line-height: 1.12; letter-spacing: -.02em; margin: 10px 0 14px; font-weight: 800;
+     text-wrap: balance; }
+.lead { font-size: clamp(17px, 1.9vw, 20px); color: var(--fg2); max-width: 64ch; margin: 0 0 34px; }
+.mono { font-family: var(--mono); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
+.grid2 > * { min-width: 0; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } .band { padding-block: 72px; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+.tag { display: inline-block; font-family: var(--mono); font-size: 11.5px; padding: 2px 9px; border-radius: 99px;
+       border: 1px solid var(--line2); color: var(--fg2); }
+.chapters { position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%); z-index: 20;
+            display: flex; flex-direction: column; gap: 10px; }
+.chapters a { width: 10px; height: 10px; border-radius: 50%; background: var(--line2); display: block; position: relative; }
+.chapters a.cur { background: var(--accent); box-shadow: 0 0 0 4px rgba(124,140,255,.18); }
+.chapters a span { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 12px;
+                   color: var(--fg2); background: var(--panel); border: 1px solid var(--line); padding: 2px 8px; border-radius: 6px;
+                   opacity: 0; pointer-events: none; transition: opacity .2s; }
+.chapters a:hover span, .chapters a:focus-visible span { opacity: 1; }
+@media (max-width: 860px) { .chapters { display: none; } }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ---------- hero ---------- */
+.hero { min-height: 92vh; display: flex; align-items: center; position: relative; overflow: hidden; padding-block: 90px 70px; }
+#net { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero::after { content: ""; position: absolute; inset: 0; background:
+  radial-gradient(ellipse at 30% 45%, rgba(10,15,30,.15), rgba(10,15,30,.86) 70%),
+  linear-gradient(180deg, rgba(10,15,30,0) 60%, var(--bg)); pointer-events: none; }
+.hero .wrap { position: relative; z-index: 2; width: 100%; }
+.hero h1 { font-size: clamp(40px, 7vw, 82px); line-height: 1.02; letter-spacing: -.035em; margin: 16px 0 18px; font-weight: 800;
+           max-width: 14ch; }
+.hero h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent2), var(--teal)); -webkit-background-clip: text;
+              background-clip: text; color: transparent; }
+.hero p { font-size: clamp(18px, 2.1vw, 22px); color: var(--fg2); max-width: 46ch; margin: 0 0 30px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; max-width: 860px; }
+@media (max-width: 700px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { background: rgba(18,26,51,.78); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; backdrop-filter: blur(6px); }
+.stat b { display: block; font-size: 30px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); line-height: 1.35; display: block; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; font: 600 15px var(--sans); padding: 12px 18px; border-radius: 11px;
+       text-decoration: none; border: 1px solid var(--line2); color: var(--fg); background: var(--panel); cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #0A0F1E; }
+.scrollhint { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 2; font-size: 12px; color: var(--muted);
+              font-family: var(--mono); letter-spacing: .12em; text-transform: uppercase; animation: bob 2.4s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translate(-50%, 6px); } }
+
+/* ---------- 1 the problem ---------- */
+.tasks { display: grid; grid-template-columns: repeat(10, 1fr); gap: 7px; }
+.tk { aspect-ratio: 1; border-radius: 7px; background: var(--panel2); border: 1px solid var(--line); position: relative; }
+/* final states are the resting styles; the animations only run "from" a blank tile, so reduced motion still shows them */
+.tk.solved { background: rgba(76,194,146,.22); border-color: rgba(76,194,146,.65); }
+.tk.failed { background: rgba(242,101,125,.32); border-color: var(--red); box-shadow: 0 0 14px rgba(242,101,125,.45); }
+.on .tk { animation: tkIn .5s ease-out both; animation-delay: calc(var(--i) * 45ms); }
+@keyframes tkIn { from { background: var(--panel2); border-color: var(--line); box-shadow: none; } }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13.5px; color: var(--fg2); margin-top: 14px; }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+.meter { margin-top: 22px; }
+.meter .bar { height: 10px; border-radius: 99px; background: var(--panel2); overflow: hidden; border: 1px solid var(--line); }
+.meter .fill { height: 100%; width: 92%; background: linear-gradient(90deg, var(--amber), var(--red)); border-radius: 99px; }
+.on .meter .fill { animation: grow 3.4s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes grow { from { width: 4%; } }
+.meter .lbl { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 7px; font-family: var(--mono); }
+.points { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.points li { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; }
+.points .ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--panel2);
+              border: 1px solid var(--line); font-family: var(--mono); font-size: 13px; color: var(--accent2); }
+.points b { color: var(--fg); }
+.points span { color: var(--fg2); font-size: 15.5px; }
+
+/* ---------- 2 the discovery ---------- */
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 10px; }
+.stage svg { width: 100%; height: auto; display: block; }
+.stage text { font-family: var(--sans); }
+.replay { margin: 12px 4px 2px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+          font-size: 13px; color: var(--muted); }
+.step { opacity: .35; transition: opacity .3s, color .3s; }
+.step.now { opacity: 1; color: var(--fg); }
+.steps { display: grid; gap: 10px; margin-top: 18px; counter-reset: s; }
+.steps div { display: grid; grid-template-columns: 28px 1fr; gap: 10px; font-size: 15.5px; color: var(--fg2); }
+.steps div::before { counter-increment: s; content: counter(s); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+                     font: 600 12.5px var(--mono); background: var(--panel2); border: 1px solid var(--line2); color: var(--accent2); }
+.steps div.now { color: var(--fg); }
+.steps div.now::before { background: var(--accent); color: #0A0F1E; border-color: var(--accent); }
+.evidence { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 34px; }
+@media (max-width: 760px) { .evidence { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ev { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.ev > b { font-size: 34px; font-weight: 800; letter-spacing: -.02em; display: block; font-variant-numeric: tabular-nums; }
+.ev.r > b { color: var(--red); } .ev.g > b { color: var(--green); } .ev.a > b { color: var(--amber); }
+.ev span b { color: var(--fg); font-weight: 600; }
+.ev span { font-size: 13.5px; color: var(--fg2); line-height: 1.4; display: block; }
+.quote { margin-top: 26px; border-left: 3px solid var(--amber); padding: 6px 0 6px 16px; color: var(--fg2); font-size: 16px; }
+.quote b { color: var(--fg); font-weight: 600; }
+
+/* ---------- 3 the graph ---------- */
+.graphframe { border: 1px solid var(--line2); border-radius: 18px; overflow: hidden; background: #0e131a; box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+.graphframe iframe { width: 100%; height: min(860px, 86vh); border: 0; display: block; }
+.graphbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line);
+            background: var(--panel); font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.dots { display: flex; gap: 6px; } .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line2); display: block; }
+.legend2 { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; font-size: 13.5px; color: var(--fg2); }
+.legend2 span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--c); margin-right: 7px; }
+
+/* ---------- 4 how it works ---------- */
+.loopsvg { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 8px; }
+.loopsvg svg { width: 100%; height: auto; display: block; }
+.stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 26px; }
+@media (max-width: 900px) { .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .stages { grid-template-columns: 1fr; } }
+.stg { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; position: relative; overflow: hidden; }
+.stg .n { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+.stg h3 { margin: 4px 0 6px; font-size: 19px; }
+.stg p { margin: 0; color: var(--fg2); font-size: 14.5px; line-height: 1.5; }
+.stg .file { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.on .stg { animation: rise .6s ease-out both; animation-delay: calc(var(--i) * 140ms); }
+@keyframes rise { from { transform: translateY(18px); opacity: .2; } }
+
+/* ---------- 5 harvester ---------- */
+.pool { display: grid; grid-template-columns: repeat(24, 1fr); gap: 4px; }
+.pl { aspect-ratio: 1; border-radius: 3px; background: rgba(124,140,255,.34); }
+.on .pl { animation: plIn .4s ease-out both; animation-delay: calc(var(--i) * 6ms); }
+.pl.out { background: var(--panel2); opacity: .55; }
+.pl.top { background: var(--amber); box-shadow: 0 0 12px rgba(255,195,90,.8); }
+.on .pl.out { animation: plIn .4s ease-out both, plOut .6s ease-in both; animation-delay: calc(var(--i) * 6ms), calc(1.6s + var(--i) * 3ms); }
+.on .pl.top { animation: plIn .4s ease-out both, plTop .8s ease-out both; animation-delay: calc(var(--i) * 6ms), 2.8s; }
+@keyframes plIn { from { transform: scale(.2); opacity: 0; } }
+@keyframes plOut { from { background: rgba(124,140,255,.34); opacity: 1; } }
+@keyframes plTop { from { background: rgba(124,140,255,.34); box-shadow: none; } }
+.funnel { display: grid; gap: 8px; margin-top: 18px; }
+.fn { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
+.fn .b { height: 32px; border-radius: 8px; background: linear-gradient(90deg, rgba(124,140,255,.35), rgba(124,140,255,.12));
+         border: 1px solid var(--line2); display: flex; align-items: center; padding: 0 12px; font-size: 13.5px; color: var(--fg);
+         width: var(--w); white-space: nowrap; overflow: hidden; }
+.on .fn .b { animation: fnIn .9s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i) * 260ms); }
+@keyframes fnIn { from { clip-path: inset(0 100% 0 0); } }
+.fn .v { font-family: var(--mono); font-size: 14px; color: var(--fg2); font-variant-numeric: tabular-nums; min-width: 6ch; text-align: right; }
+.score { display: grid; gap: 10px; }
+.sc { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.sc .t { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; margin-bottom: 8px; }
+.sc .t span:last-child { font-family: var(--mono); color: var(--muted); font-size: 12.5px; }
+.sc .row { display: grid; grid-template-columns: 70px 1fr 42px; gap: 10px; align-items: center; font-size: 12.5px; color: var(--fg2); }
+.sc .row + .row { margin-top: 5px; }
+.sc .track { height: 8px; border-radius: 99px; background: var(--panel2); overflow: hidden; }
+.sc .track i { display: block; height: 100%; width: var(--p); border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--red)); }
+.on .sc .track i { animation: grow2 1.4s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(.4s + var(--i) * 200ms); }
+@keyframes grow2 { from { width: 0; } }
+.sc .why { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.note { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+
+/* ---------- 6 learning ---------- */
+.brier { display: grid; gap: 16px; }
+.br { display: grid; grid-template-columns: 170px 1fr 64px; gap: 14px; align-items: center; font-size: 15px; }
+.br .track { height: 26px; background: var(--panel2); border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+.br .track i { display: block; height: 100%; width: var(--w); background: var(--c); border-radius: 8px; }
+.on .br .track i { animation: grow2 1.6s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i) * 300ms); }
+.br .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 16px; text-align: right; }
+.br.best { font-weight: 700; } .br.best .v { color: var(--green); }
+@media (max-width: 600px) { .br { grid-template-columns: 1fr 56px; } .br .track { grid-column: 1 / -1; grid-row: 2; } }
+.loopfacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 26px; }
+@media (max-width: 760px) { .loopfacts { grid-template-columns: 1fr; } }
+.lf { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; font-size: 14.5px; color: var(--fg2); }
+.lf b { color: var(--fg); display: block; font-size: 16px; margin-bottom: 4px; }
+
+/* ---------- 7 judge ---------- */
+.checks { display: grid; gap: 9px; }
+.ck { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 12px; padding: 11px 14px; font-size: 15px; }
+.ck .m { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-weight: 700;
+         background: var(--panel2); color: var(--muted); border: 1px solid var(--line2); }
+.ck .r { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.on .ck .m { animation: tick .45s ease-out both; animation-delay: calc(.3s + var(--i) * 380ms); }
+@keyframes tick { from { transform: scale(.4); background: var(--panel2); color: var(--muted); } 60% { transform: scale(1.18); } }
+.ck.ok .m { background: rgba(76,194,146,.18); color: var(--green); border-color: rgba(76,194,146,.6); }
+.ck.drop .m { background: rgba(242,101,125,.18); color: var(--red); border-color: rgba(242,101,125,.6); }
+.ck.half .m { background: rgba(255,195,90,.16); color: var(--amber); border-color: rgba(255,195,90,.6); }
+.gates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.gate { border: 1px dashed var(--amber); border-radius: 14px; padding: 14px 16px; background: rgba(255,195,90,.06); }
+.gate b { color: var(--amber); display: block; font-size: 15px; }
+.gate span { font-size: 14px; color: var(--fg2); }
+.money { margin-top: 14px; display: grid; gap: 8px; }
+.money div { display: flex; justify-content: space-between; gap: 12px; font-size: 14.5px; padding: 9px 14px; border-radius: 10px; background: var(--panel);
+             border: 1px solid var(--line); }
+.money .free { color: var(--green); font-family: var(--mono); font-size: 12.5px; }
+.money .paid { color: var(--amber); font-family: var(--mono); font-size: 12.5px; }
+
+/* ---------- 8 trust + 9 try ---------- */
+.trust { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 860px) { .trust { grid-template-columns: 1fr; } }
+.tr { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.tr b { display: block; font-size: 16.5px; margin-bottom: 6px; }
+.tr span { color: var(--fg2); font-size: 14.5px; }
+.term { background: #060912; border: 1px solid var(--line2); border-radius: 14px; overflow: hidden; }
+.term .top { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line);
+             font-size: 12px; color: var(--muted); font-family: var(--mono); gap: 10px; }
+.term pre { margin: 0; padding: 16px 18px; font-family: var(--mono); font-size: 13.5px; line-height: 1.75; color: #C8D0E8; overflow-x: auto; }
+.term .p { color: var(--green); } .term .c { color: var(--muted); } .term .h { color: var(--accent2); } .term .y { color: var(--amber); }
+.copy { font: 600 12px var(--sans); background: var(--panel2); color: var(--fg); border: 1px solid var(--line2); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+footer.end { padding-block: 46px 60px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+footer.end .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<nav class="chapters" aria-label="Chapters">
+  <a href="#top"><span>Start</span></a><a href="#problem"><span>The problem</span></a><a href="#discovery"><span>The discovery</span></a>
+  <a href="#graph"><span>Knowledge graph</span></a><a href="#how"><span>How it works</span></a><a href="#harvest"><span>Harvester</span></a>
+  <a href="#learn"><span>It learns</span></a><a href="#judge"><span>Judge</span></a><a href="#try"><span>Try it</span></a>
+</nav>
+
+<!-- ============================== HERO ============================== -->
+<section class="hero" id="top">
+  <canvas id="net" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <div class="kicker">Vanguard · failure intelligence for LLM coding agents</div>
+    <h1>Know which tasks an AI <em>will fail</em> before you pay to run them.</h1>
+    <p>Vanguard is a self-improving knowledge graph. It studies why coding agents fail at real security fixes, ranks
+      thousands of real vulnerabilities by how likely each one is to beat a model, and builds the winners into fair
+      benchmark tasks.</p>
+    <div class="stats">
+      <div class="stat"><b data-count="1928" data-sep>0</b><span>real advisories ranked in about 12 seconds, at no cost</span></div>
+      <div class="stat"><b data-count="92">0</b><span>findings in the knowledge graph, linked by 125 relations</span></div>
+      <div class="stat"><b data-count="0" data-final="0">0</b><span>dependencies: pure Python standard library</span></div>
+      <div class="stat"><b data-count="30">0</b><span>tests, including the full loop end to end</span></div>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="#problem">Take the 3-minute tour ↓</a>
+      <a class="btn" href="#graph">Jump to the knowledge graph</a>
+      <a class="btn" href="https://github.com/abdulhadiadnan1080/Vanguard">GitHub</a>
+    </div>
+  </div>
+  <div class="scrollhint">scroll</div>
+</section>
+
+<!-- ============================== 1 PROBLEM ============================== -->
+<section class="band" id="problem" data-anim>
+  <div class="wrap grid2">
+    <div>
+      <div class="kicker">01 · The problem</div>
+      <h2>Most benchmark tasks are wasted money.</h2>
+      <p class="lead">To test an AI coding agent you need tasks it actually <b>fails</b>. Today the only way to find one
+        is to build it, check it, pay for the model runs, and hope. Most of the time the agent solves it, and the work
+        teaches you nothing.</p>
+      <ul class="points">
+        <li><span class="ic">01</span><span><b>Building a task is slow.</b> A real vulnerability, a Docker image, hidden tests, a fairness review.</span></li>
+        <li><span class="ic">02</span><span><b>Running it costs money.</b> Every attempt by every model is a paid API call.</span></li>
+        <li><span class="ic">03</span><span><b>Most get solved.</b> A strong agent fixes the obvious vulnerability, and the task is thrown away.</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="tasks" id="taskgrid" aria-label="Illustration: 60 candidate tasks, most solved, few failed"></div>
+      <div class="legend"><span><i style="background:rgba(76,194,146,.5)"></i>solved: money spent, nothing learned</span>
+        <span><i style="background:var(--red)"></i>failed: the tasks you wanted</span></div>
+      <div class="meter"><div class="bar"><div class="fill"></div></div>
+        <div class="lbl"><span>spend on tasks that get solved</span><span>illustration</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 2 DISCOVERY ============================== -->
+<section class="band alt" id="discovery" data-anim>
+  <div class="wrap">
+    <div class="kicker">02 · The discovery</div>
+    <h2>We found exactly <span style="color:var(--amber)">how</span> a strong model fails, and reproduced it on demand.</h2>
+    <p class="lead">Some security fixes need <b>two</b> changes: the <b>check</b> that decides "allowed or not", and the
+      <b>data producer</b> that saves and reloads the data that check relies on. Watch what the model does.</p>
+    <div class="grid2" style="align-items:start">
+      <div class="stage">
+        <svg id="story" viewBox="0 0 560 360" role="img" aria-label="Animated replay: the model fixes the check, notices the data producer, dismisses it with an assumption, and the attack slips through the producer path">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,1 L9,5 L0,9z" fill="#2F3D63"/></marker>
+            <filter id="gl"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+          <!-- request entering -->
+          <text x="22" y="40" fill="#8590AD" font-size="12" font-family="JetBrains Mono, monospace">attacker's request</text>
+          <!-- path A: direct to check -->
+          <path d="M40 70 H 200" stroke="#2F3D63" stroke-width="2" marker-end="url(#ah)" fill="none"/>
+          <!-- path B: via storage -> producer -> check -->
+          <path d="M40 70 V 250 H 200" stroke="#2F3D63" stroke-width="2" marker-end="url(#ah)" fill="none"/>
+          <circle cx="40" cy="70" r="7" fill="#F2657D"/>
+          <!-- check box -->
+          <g id="checkBox">
+            <rect x="204" y="44" width="150" height="54" rx="10" fill="#18213F" stroke="#2F3D63" stroke-width="1.5"/>
+            <rect class="checkFix" x="204" y="44" width="150" height="54" rx="10" fill="rgba(76,194,146,.16)" stroke="#4CC292" stroke-width="2" opacity="0"/>
+            <text x="279" y="67" text-anchor="middle" fill="#E8ECF7" font-size="14" font-weight="600">Check</text>
+            <text x="279" y="85" text-anchor="middle" fill="#8590AD" font-size="11">decides "allowed?"</text>
+          </g>
+          <!-- producer box -->
+          <g>
+            <rect x="204" y="224" width="150" height="54" rx="10" fill="#18213F" stroke="#2F3D63" stroke-width="1.5"/>
+            <rect class="prodWarn" x="204" y="224" width="150" height="54" rx="10" fill="none" stroke="#FFC35A" stroke-width="2" stroke-dasharray="5 4" opacity="0"/>
+            <text x="279" y="247" text-anchor="middle" fill="#E8ECF7" font-size="14" font-weight="600">Data producer</text>
+            <text x="279" y="265" text-anchor="middle" fill="#8590AD" font-size="11">saves &amp; reloads data</text>
+          </g>
+          <!-- producer feeds check -->
+          <path d="M354 251 H 400 V 71 H 358" stroke="#2F3D63" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+          <text x="410" y="165" fill="#8590AD" font-size="11" font-family="JetBrains Mono, monospace">reloaded later,</text>
+          <text x="410" y="180" fill="#8590AD" font-size="11" font-family="JetBrains Mono, monospace">security field lost</text>
+          <!-- outcome -->
+          <g class="leak" opacity="0">
+            <rect x="420" y="296" width="126" height="40" rx="10" fill="rgba(242,101,125,.18)" stroke="#F2657D" stroke-width="1.5"/>
+            <text x="483" y="321" text-anchor="middle" fill="#F2657D" font-size="13" font-weight="700">secret leaked</text>
+          </g>
+          <g class="blocked" opacity="0">
+            <text x="279" y="30" text-anchor="middle" fill="#4CC292" font-size="12" font-weight="600">✓ direct attack blocked</text>
+          </g>
+          <!-- the model -->
+          <g class="agent">
+            <circle r="17" fill="#7C8CFF" filter="url(#gl)"/>
+            <text text-anchor="middle" y="5" fill="#0A0F1E" font-size="14" font-weight="800">A</text>
+          </g>
+          <!-- thought bubble -->
+          <g class="thought" opacity="0">
+            <rect x="34" y="118" width="250" height="64" rx="12" fill="#121A33" stroke="#FFC35A" stroke-width="1.5"/>
+            <text x="50" y="142" fill="#FFC35A" font-size="12.5" font-weight="600">"The schema drops that field…</text>
+            <text x="50" y="162" fill="#E8ECF7" font-size="12.5">but the app keeps it when saving."</text>
+          </g>
+          <g class="done" opacity="0">
+            <rect x="34" y="296" width="172" height="40" rx="10" fill="#121A33" stroke="#4CC292" stroke-width="1.5"/>
+            <text x="120" y="321" text-anchor="middle" fill="#4CC292" font-size="12.5" font-weight="600">tests pass → "done"</text>
+          </g>
+          <!-- the attack sneaking through the producer path -->
+          <circle class="attack" r="7" fill="#F2657D" filter="url(#gl)" opacity="0"/>
+        </svg>
+        <div class="replay"><span id="storyCaption">Press play, or scroll here to start</span>
+          <button class="copy" id="replay" type="button">↻ Replay</button></div>
+      </div>
+      <div>
+        <div class="steps" id="storySteps">
+          <div data-t="0"><span>It reads the report and goes straight to the <b>check</b>.</span></div>
+          <div data-t="1"><span>It fixes the check correctly. Every single time.</span></div>
+          <div data-t="2"><span>It <b>notices</b> the data producer drops the security field.</span></div>
+          <div data-t="3"><span>It dismisses it with an assumption it never tests.</span></div>
+          <div data-t="4"><span>The existing tests pass, so it stops.</span></div>
+          <div data-t="5"><span>The attack still gets through the save-and-reload path.</span></div>
+        </div>
+        <div class="quote">Real quote from a failed run: <b>"If parsed, the field is unknown and removed! This is critical."</b>
+          A few sentences later: <b>"Fine. Gate done."</b></div>
+      </div>
+    </div>
+    <div class="evidence">
+      <div class="ev r"><b data-count="8" data-suffix=" / 8">0</b><span>tasks in this shape failed on <b>every</b> run, including pass@3 = 0 on a real, unmodified codebase</span></div>
+      <div class="ev g"><b data-count="6" data-suffix=" / 6">0</b><span>explains the bug correctly when asked directly: it is <b>not a knowledge gap</b></span></div>
+      <div class="ev a"><b data-count="0" data-final="0" data-suffix=" / 6">0</b><span>solved after generic prompts like "check your assumptions": reminders don't work</span></div>
+      <div class="ev g"><b data-count="3" data-suffix=" / 3">0</b><span>solved once one failing test exposes the second path: it follows <b>evidence</b></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 3 GRAPH ============================== -->
+<section class="band" id="graph" data-anim>
+  <div class="wrap">
+    <div class="kicker">03 · The knowledge graph</div>
+    <h2>Every finding, linked to the evidence behind it.</h2>
+    <p class="lead">This is the live graph. Each dot is a finding: a weakness, the conditions that trigger it, the
+      reasons the model gave, the experiments that isolated the cause, and the tasks that expose it. <b>Click any dot</b>
+      to light up what it connects to.</p>
+    <div class="graphframe">
+      <div class="graphbar"><div class="dots"><i></i><i></i><i></i></div><span>interactive · drag to pan · scroll to zoom · click a node</span>
+        <a href="graph.html" target="_blank" rel="noopener">open full screen ↗</a></div>
+      <iframe title="Vanguard knowledge graph" loading="lazy" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-theme=&quot;dark&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1, viewport-fit=cover&quot;&gt;
+&lt;style&gt;:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}&lt;/style&gt;
+&lt;title&gt;Agent Failure Map&lt;/title&gt;
+&lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.googleapis.com&quot;&gt;
+&lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.gstatic.com&quot; crossorigin&gt;
+&lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans+Condensed:wght@500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap&quot;&gt;
+&lt;style&gt;
 /* Layout: slim header, then the graph canvas (flexible) beside a fixed-width inspector; stacks below 900px. Node index at the foot. */
 :root{
   --bg:#f3f5f8; --surface:#ffffff; --fg:#17202b; --muted:#566274; --line:#d6dce4; --edge:#a3aebb; --accent:#2f46c9;
   --t-model:#17202b; --t-weak:#c2334a; --t-cond:#b06f12; --t-task:#2f6fb5; --t-find:#7048b8; --t-reason:#a64a94;
   --t-code:#7d6a50; --t-strength:#1f8159; --t-design:#4a5d75; --t-method:#3f8593;
   --ok:#1f8159; --bad:#c2334a;
-  --font-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
-  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --font-display:&quot;IBM Plex Sans Condensed&quot;,&quot;Arial Narrow&quot;,system-ui,sans-serif;
+  --font-body:&quot;IBM Plex Sans&quot;,system-ui,-apple-system,&quot;Segoe UI&quot;,sans-serif;
+  --font-mono:&quot;IBM Plex Mono&quot;,ui-monospace,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
+  :root:not([data-theme=&quot;light&quot;]){
     --bg:#0e131a; --surface:#151c25; --fg:#e3e8ee; --muted:#94a1b2; --line:#283340; --edge:#4c5a6b; --accent:#8d9cff;
     --t-model:#e3e8ee; --t-weak:#f06a7e; --t-cond:#e3a54a; --t-task:#68a6ea; --t-find:#ab88ef; --t-reason:#d88aca;
     --t-code:#bca98d; --t-strength:#4cc292; --t-design:#9cb0c7; --t-method:#78c0cc;
     --ok:#4cc292; --bad:#f06a7e; color-scheme:dark;
   }
 }
-:root[data-theme="dark"]{
+:root[data-theme=&quot;dark&quot;]{
   --bg:#0e131a; --surface:#151c25; --fg:#e3e8ee; --muted:#94a1b2; --line:#283340; --edge:#4c5a6b; --accent:#8d9cff;
   --t-model:#e3e8ee; --t-weak:#f06a7e; --t-cond:#e3a54a; --t-task:#68a6ea; --t-find:#ab88ef; --t-reason:#d88aca;
   --t-code:#bca98d; --t-strength:#4cc292; --t-design:#9cb0c7; --t-method:#78c0cc;
@@ -52,8 +445,8 @@ h1{font-family:var(--font-display);font-weight:600;font-size:clamp(24px,3.2vw,34
 .chip{font:500 12px/1 var(--font-body);display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;
   border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
 .chip .dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
-.chip[aria-pressed="false"]{color:var(--muted);background:transparent}
-.chip[aria-pressed="false"] .dot{background:transparent;box-shadow:inset 0 0 0 1.5px var(--c)}
+.chip[aria-pressed=&quot;false&quot;]{color:var(--muted);background:transparent}
+.chip[aria-pressed=&quot;false&quot;] .dot{background:transparent;box-shadow:inset 0 0 0 1.5px var(--c)}
 .chip:focus-visible,.btn:focus-visible,.search:focus-visible,.conn button:focus-visible,.idx button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .spacer{flex:1}
 .search{font:13px var(--font-body);padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);width:200px;max-width:100%}
@@ -127,279 +520,279 @@ dl.meta dt{color:var(--muted)}dl.meta dd{margin:0;font-family:var(--font-mono);f
   .spacer{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-</style>
-</head>
-<body>
+&lt;/style&gt;
+&lt;style&gt;header,section.index{display:none!important}body{padding-block:0!important;padding-inline:0!important;background:#0e131a}.wrap{max-width:none!important;gap:10px!important;padding:10px}@media (min-width:900px){.canvas,.panel{height:calc(100vh - 130px)!important;max-height:none!important}}&lt;/style&gt;&lt;/head&gt;
+&lt;body&gt;
 
-<div class="wrap">
-  <header>
-    <div class="eyebrow">Knowledge graph</div>
-    <h1>Weaknesses and failure patterns of LLM coding agents</h1>
-    <p class="lede">A map of where large language models break down when they fix real security vulnerabilities: each weakness, the conditions that trigger it, the evidence behind it, the tasks that expose it, and what that means for designing harder tasks. Select a node to read its detail and follow its connections.</p>
-    <div class="models">
-      <div class="mrow"><span class="mlabel">Applies to models such as</span><span class="mchip">GPT</span><span class="mchip">Claude</span><span class="mchip">Gemini</span><span class="mchip">Qwen</span><span class="mchip">Kimi</span><span class="mchip">GLM</span><span class="mchip">Llama</span><span class="mchip">Mistral</span></div>
-    </div>
-    <div class="facts">
-      <span><b>~66</b> graded runs</span>
-      <span><b>19/19</b> runs fail in the primary shape</span>
-      <span>real agent-protocol SDK <b>pass@3 = 0</b></span>
-      <span><b>3</b> knowledge-base entries, <b>2</b> models</span>
-    </div>
-  </header>
+&lt;div class=&quot;wrap&quot;&gt;
+  &lt;header&gt;
+    &lt;div class=&quot;eyebrow&quot;&gt;Knowledge graph&lt;/div&gt;
+    &lt;h1&gt;Weaknesses and failure patterns of LLM coding agents&lt;/h1&gt;
+    &lt;p class=&quot;lede&quot;&gt;A map of where large language models break down when they fix real security vulnerabilities: each weakness, the conditions that trigger it, the evidence behind it, the tasks that expose it, and what that means for designing harder tasks. Select a node to read its detail and follow its connections.&lt;/p&gt;
+    &lt;div class=&quot;models&quot;&gt;
+      &lt;div class=&quot;mrow&quot;&gt;&lt;span class=&quot;mlabel&quot;&gt;Applies to models such as&lt;/span&gt;&lt;span class=&quot;mchip&quot;&gt;GPT&lt;/span&gt;&lt;span class=&quot;mchip&quot;&gt;Claude&lt;/span&gt;&lt;span class=&quot;mchip&quot;&gt;Gemini&lt;/span&gt;&lt;span class=&quot;mchip&quot;&gt;Qwen&lt;/span&gt;&lt;span class=&quot;mchip&quot;&gt;Kimi&lt;/span&gt;&lt;span class=&quot;mchip&quot;&gt;GLM&lt;/span&gt;&lt;span class=&quot;mchip&quot;&gt;Llama&lt;/span&gt;&lt;span class=&quot;mchip&quot;&gt;Mistral&lt;/span&gt;&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;facts&quot;&gt;
+      &lt;span&gt;&lt;b&gt;~66&lt;/b&gt; graded runs&lt;/span&gt;
+      &lt;span&gt;&lt;b&gt;19/19&lt;/b&gt; runs fail in the primary shape&lt;/span&gt;
+      &lt;span&gt;real agent-protocol SDK &lt;b&gt;pass@3 = 0&lt;/b&gt;&lt;/span&gt;
+      &lt;span&gt;&lt;b&gt;3&lt;/b&gt; knowledge-base entries, &lt;b&gt;2&lt;/b&gt; models&lt;/span&gt;
+    &lt;/div&gt;
+  &lt;/header&gt;
 
-  <div class="toolbar" id="toolbar" aria-label="Filter node types"></div>
+  &lt;div class=&quot;toolbar&quot; id=&quot;toolbar&quot; aria-label=&quot;Filter node types&quot;&gt;&lt;/div&gt;
 
-  <div class="stage">
-    <div class="canvas" id="canvas">
-      <div class="hint">drag to pan · scroll or pinch to zoom · click a node</div>
-      <div class="legend-ring"><span class="t-ok" style="--c:var(--ok)"><i></i>solved</span><span style="--c:var(--bad)"><i></i>failed</span></div>
-    </div>
-    <aside class="panel" id="panel" aria-live="polite"></aside>
-  </div>
+  &lt;div class=&quot;stage&quot;&gt;
+    &lt;div class=&quot;canvas&quot; id=&quot;canvas&quot;&gt;
+      &lt;div class=&quot;hint&quot;&gt;drag to pan · scroll or pinch to zoom · click a node&lt;/div&gt;
+      &lt;div class=&quot;legend-ring&quot;&gt;&lt;span class=&quot;t-ok&quot; style=&quot;--c:var(--ok)&quot;&gt;&lt;i&gt;&lt;/i&gt;solved&lt;/span&gt;&lt;span style=&quot;--c:var(--bad)&quot;&gt;&lt;i&gt;&lt;/i&gt;failed&lt;/span&gt;&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;aside class=&quot;panel&quot; id=&quot;panel&quot; aria-live=&quot;polite&quot;&gt;&lt;/aside&gt;
+  &lt;/div&gt;
 
-  <section class="index">
-    <h2>All nodes</h2>
-    <div class="idxgrid" id="index"></div>
-  </section>
-</div>
+  &lt;section class=&quot;index&quot;&gt;
+    &lt;h2&gt;All nodes&lt;/h2&gt;
+    &lt;div class=&quot;idxgrid&quot; id=&quot;index&quot;&gt;&lt;/div&gt;
+  &lt;/section&gt;
+&lt;/div&gt;
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-<script>
+&lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
 const TYPES = {
-  model:{name:"Model"}, weak:{name:"Weakness"}, cond:{name:"Trigger condition"}, find:{name:"Evidence"},
-  reason:{name:"Dismissal reason"}, task:{name:"Task"}, code:{name:"Code entity"}, strength:{name:"Strength"},
-  design:{name:"Task-design implication"}, method:{name:"Method"}
+  model:{name:&quot;Model&quot;}, weak:{name:&quot;Weakness&quot;}, cond:{name:&quot;Trigger condition&quot;}, find:{name:&quot;Evidence&quot;},
+  reason:{name:&quot;Dismissal reason&quot;}, task:{name:&quot;Task&quot;}, code:{name:&quot;Code entity&quot;}, strength:{name:&quot;Strength&quot;},
+  design:{name:&quot;Task-design implication&quot;}, method:{name:&quot;Method&quot;}
 };
 
 const N = [
-  {id:"ds",type:"model",label:"Model A",title:"Model A",r:22,
-   detail:["Studied on security-fix tasks built from real, unmodified open-source vulnerabilities, and on controlled variants that put back parts of real upstream fixes into healthy code.","One primary weakness, reproduced on a real repository at pass@3 = 0 with its cause isolated, and three secondary patterns."],
-   meta:[["Reasoning","enabled, maximum effort"],["Also in knowledge base","unreported sibling sites"]]},
-  {id:"mB",type:"model",label:"Model B",title:"Model B",r:18,
-   detail:["A second model tracked in the weakness knowledge base. Its recorded results are smaller: one supported weakness of its own, plus the single-explicit-check tasks that both models solve."],
-   meta:[["Weaknesses recorded","1 (stacked vulnerabilities)"],["Shared anti-weakness","single explicit check"]]},
+  {id:&quot;ds&quot;,type:&quot;model&quot;,label:&quot;Model A&quot;,title:&quot;Model A&quot;,r:22,
+   detail:[&quot;Studied on security-fix tasks built from real, unmodified open-source vulnerabilities, and on controlled variants that put back parts of real upstream fixes into healthy code.&quot;,&quot;One primary weakness, reproduced on a real repository at pass@3 = 0 with its cause isolated, and three secondary patterns.&quot;],
+   meta:[[&quot;Reasoning&quot;,&quot;enabled, maximum effort&quot;],[&quot;Also in knowledge base&quot;,&quot;unreported sibling sites&quot;]]},
+  {id:&quot;mB&quot;,type:&quot;model&quot;,label:&quot;Model B&quot;,title:&quot;Model B&quot;,r:18,
+   detail:[&quot;A second model tracked in the weakness knowledge base. Its recorded results are smaller: one supported weakness of its own, plus the single-explicit-check tasks that both models solve.&quot;],
+   meta:[[&quot;Weaknesses recorded&quot;,&quot;1 (stacked vulnerabilities)&quot;],[&quot;Shared anti-weakness&quot;,&quot;single explicit check&quot;]]},
 
-  {id:"W0",type:"weak",label:"Assumptions",title:"Primary weakness: a spotted risk dismissed with an untested assumption",r:20,
-   detail:["Some fixes need two coordinated changes: the check that decides allowed or not, and the data producer (schema, serializer, parser, loader) that creates or reloads the data the check relies on. If the producer drops the security field, the check is bypassed on that path.","The model fixes the check every time. It notices that the producer drops the field and thinks about the save-and-reload path, then closes the question with an assumption about how other code behaves, never verifies it, and stops once the existing tests pass."],
-   quotes:["“If parsed, issuer is unknown and removed! This is critical.” … a few sentences later: “Fine. Gate done.”","“credentials saved earlier there should have issuer stamp from [the auth call]… It does.”"],
-   meta:[["Runs failed in this shape","19 / 19"],["Failing tests","always the same 5"],["Real repository","widely used agent-protocol SDK, pass@3 = 0"],["Generic instructions","0 / 6 solved"],["Concrete failing test","3 / 3 solved"]]},
-  {id:"WA",type:"weak",label:"Nearby-bug capture",title:"Pattern A: a nearby real bug captures it, and it argues itself out of the correct fix",r:15,
-   detail:["The report describes one cause, and the code also contains a second real bug that explains the same symptom. The model identifies the reported cause early, then talks itself out of fixing it, typically because the correct fix refuses a setup the report presents as normal use. It fixes the other bug and stops."],
-   quotes:["“If the same server instance is connected to one transport only, okay” (repeated more than 10 times in Variant C)"],
-   meta:[["Variant C","failed 2 of 3 (one run solved it)"],["Variant E3","0.33"],["Variant D","0.55 (with primary)"],["Control Variant E1","solved"]]},
-  {id:"WB",type:"weak",label:"Report-bounded scope",title:"Pattern B: scope stops at what the report describes",r:15,
-   detail:["When an upstream fix closes several distinct flaws but the report describes one scenario, the model fixes that scenario cleanly and does not look for flaws of a different kind elsewhere.","It does reliably find repeated copies of the same flaw, even across files and languages. The miss is specific to different kinds of flaw the report does not suggest."],
-   meta:[["Git wrapper SN","0.29"],["AI agent framework SN","0.60"],["Both S1 controls","solved"]]},
-  {id:"WC",type:"weak",label:"Self-confirming verification",title:"Pattern C: self-confirming verification",r:15,
-   detail:["The model decides it is done once the existing test suite, typecheck and lint pass and its own reproduction of the reported scenario passes. Its probes go through the path it already fixed; it does not test the second path it considered and dismissed.","Where it did test the second path (2 of 3 B2 runs) it fixed it. A visible failing test on that path is the one intervention that flips the result."],
-   meta:[["Save-and-reload tested","0 / 12 failed runs"],["Concurrent repro in Variant C","none in 194 steps"],["Visible failing test","3 / 3 solved"]]},
+  {id:&quot;W0&quot;,type:&quot;weak&quot;,label:&quot;Assumptions&quot;,title:&quot;Primary weakness: a spotted risk dismissed with an untested assumption&quot;,r:20,
+   detail:[&quot;Some fixes need two coordinated changes: the check that decides allowed or not, and the data producer (schema, serializer, parser, loader) that creates or reloads the data the check relies on. If the producer drops the security field, the check is bypassed on that path.&quot;,&quot;The model fixes the check every time. It notices that the producer drops the field and thinks about the save-and-reload path, then closes the question with an assumption about how other code behaves, never verifies it, and stops once the existing tests pass.&quot;],
+   quotes:[&quot;“If parsed, issuer is unknown and removed! This is critical.” … a few sentences later: “Fine. Gate done.”&quot;,&quot;“credentials saved earlier there should have issuer stamp from [the auth call]… It does.”&quot;],
+   meta:[[&quot;Runs failed in this shape&quot;,&quot;19 / 19&quot;],[&quot;Failing tests&quot;,&quot;always the same 5&quot;],[&quot;Real repository&quot;,&quot;widely used agent-protocol SDK, pass@3 = 0&quot;],[&quot;Generic instructions&quot;,&quot;0 / 6 solved&quot;],[&quot;Concrete failing test&quot;,&quot;3 / 3 solved&quot;]]},
+  {id:&quot;WA&quot;,type:&quot;weak&quot;,label:&quot;Nearby-bug capture&quot;,title:&quot;Pattern A: a nearby real bug captures it, and it argues itself out of the correct fix&quot;,r:15,
+   detail:[&quot;The report describes one cause, and the code also contains a second real bug that explains the same symptom. The model identifies the reported cause early, then talks itself out of fixing it, typically because the correct fix refuses a setup the report presents as normal use. It fixes the other bug and stops.&quot;],
+   quotes:[&quot;“If the same server instance is connected to one transport only, okay” (repeated more than 10 times in Variant C)&quot;],
+   meta:[[&quot;Variant C&quot;,&quot;failed 2 of 3 (one run solved it)&quot;],[&quot;Variant E3&quot;,&quot;0.33&quot;],[&quot;Variant D&quot;,&quot;0.55 (with primary)&quot;],[&quot;Control Variant E1&quot;,&quot;solved&quot;]]},
+  {id:&quot;WB&quot;,type:&quot;weak&quot;,label:&quot;Report-bounded scope&quot;,title:&quot;Pattern B: scope stops at what the report describes&quot;,r:15,
+   detail:[&quot;When an upstream fix closes several distinct flaws but the report describes one scenario, the model fixes that scenario cleanly and does not look for flaws of a different kind elsewhere.&quot;,&quot;It does reliably find repeated copies of the same flaw, even across files and languages. The miss is specific to different kinds of flaw the report does not suggest.&quot;],
+   meta:[[&quot;Git wrapper SN&quot;,&quot;0.29&quot;],[&quot;AI agent framework SN&quot;,&quot;0.60&quot;],[&quot;Both S1 controls&quot;,&quot;solved&quot;]]},
+  {id:&quot;WC&quot;,type:&quot;weak&quot;,label:&quot;Self-confirming verification&quot;,title:&quot;Pattern C: self-confirming verification&quot;,r:15,
+   detail:[&quot;The model decides it is done once the existing test suite, typecheck and lint pass and its own reproduction of the reported scenario passes. Its probes go through the path it already fixed; it does not test the second path it considered and dismissed.&quot;,&quot;Where it did test the second path (2 of 3 B2 runs) it fixed it. A visible failing test on that path is the one intervention that flips the result.&quot;],
+   meta:[[&quot;Save-and-reload tested&quot;,&quot;0 / 12 failed runs&quot;],[&quot;Concurrent repro in Variant C&quot;,&quot;none in 194 steps&quot;],[&quot;Visible failing test&quot;,&quot;3 / 3 solved&quot;]]},
 
-  {id:"WS",type:"weak",label:"Unreported sibling sites",title:"Unreported sibling sites: the same flaw at several sites, one reported",r:14,
-   detail:["The same flaw exists at several sites and the report shows only one. The model fixes the reported site and misses the siblings.","This conflicts with the repeated-pattern strength (an access-control library in C and Python, an HTTP client's 4 codecs, a serialiser, and a database driver's 3 parsing paths). The sources used different setups: the knowledge-base failures come from a hinted harness and from injected siblings, while the strength comes from impact-only agentic runs. The same database driver project appears on both sides, so a rerun is needed to settle it."],
-   meta:[["Models","Model A"],["KB status","supported"],["Miner weight","+1.5"],["Detect rule","≥ 2 repeated fix sites"],["Evidence","5 runs, 5 failures"],["Updated","2026-10-15"]]},
-  {id:"WK",type:"weak",label:"Stacked vulnerabilities",title:"Stacked vulnerabilities: several independent bugs in one task",r:14,
-   detail:["Several distinct vulnerabilities in one task. The model fixes one, assumes it is done and stops, or runs out of time.","Caveat: 2 of the 3 failures hit a 60-minute limit and still need 120-minute reruns, so only 1 failure so far is a clear early stop. The controlled study ran with no time limit."],
-   meta:[["Models","Model B"],["KB status","supported"],["Miner weight","+1.0"],["Detect rule","≥ 2 advisories in the same repo"],["Evidence","7 runs, 3 failures"],["Updated","2026-10-15"]]},
-  {id:"WX",type:"strength",label:"Single explicit check (anti-weakness)",title:"Anti-weakness: one missing check in one place",
-   detail:["Both models solve these, especially when the report names the check. The miner subtracts points so such candidates rank lower."],
-   meta:[["Models","Model A and Model B"],["KB status","supported"],["Miner weight","−1.0"],["Detect rule","1 source file and ≤ 2 hunks"],["Evidence","8 runs, 0 failures"]]},
-  {id:"cs",type:"cond",label:"Same change at ≥ 2 sites",title:"The upstream fix repeats the same change at 2 or more separate sites",detail:["Different functions or files, with only one site described in the report."]},
-  {id:"ck",type:"cond",label:"≥ 2 independent bugs",title:"The task requires fixing 2 or more independent vulnerabilities",detail:["The miner detects this as 2 or more advisories in the same repository."]},
-  {id:"cx",type:"cond",label:"1 file, ≤ 2 hunks",title:"The fix is 1 source file with at most 2 hunks, or the advisory title states the missing check",detail:["When this holds, both models solve the task."]},
-  {id:"fdrv",type:"find",label:"Driver: encoded variants missed",title:"Database driver (hinted harness): fixed the reported path, still accepted encoded variants",detail:["2026-10-14. The model fixed the reported decoding path but still accepted encoded variants."],meta:[["Runs","2"],["Failures","2"],["Harness","hinted"]]},
-  {id:"finj",type:"find",label:"Injected siblings: 3/3 missed",title:"Java data-binding library with injected siblings: the same 3 missed every run",detail:["The same 3 injected sibling sites were missed in all 3 runs."],meta:[["Runs","3"],["Failures","3"]]},
-  {id:"fstk",type:"find",label:"Stacking track: 3 of 7 failed",title:"Stacking track: 3 failures in 7 runs",detail:["A budgeting app stopped early. An SSH library and a third project ran out of the 60-minute limit and need 120-minute reruns."],meta:[["Runs","7"],["Failures","3"],["Clear early stop","1"],["Timeouts","2"]]},
-  {id:"fsgl",type:"find",label:"Single checks: 0 of 8 failed",title:"Single-check tasks: no failures for either model",detail:["A JWT signature task: both models solved it 3/3 in agentic runs. A Python web-toolkit advisory: both reproduced the upstream line in a manual review."],meta:[["Runs","8"],["Failures","0"]]},
-  {id:"c1",type:"cond",label:"Check + producer fix",title:"The fix needs a data-producer change as well as the check",detail:["The producer is a schema, serializer, parser, loader or normaliser. All four conditions must hold for the primary weakness to trigger."]},
-  {id:"c2",type:"cond",label:"Save/load boundary",title:"The producer drops the field across a time or storage boundary",detail:["Data saved now and loaded later, rather than a direct call from the check. When the check calls the producer directly with a straightforward data flow (the Go role-escalation task), the model does not fail."]},
-  {id:"c3",type:"cond",label:"Report covers check path only",title:"The report describes the impact through the check's path only",detail:["The second path is not described concretely. One sentence describing it is enough to flip the result (Variant B2, 3/3)."]},
-  {id:"c4",type:"cond",label:"Tests pass either way",title:"Existing repository tests pass whether or not the producer is fixed",detail:["In the agent-protocol SDK: about 980 tests plus typecheck and lint. None save and reload a credential, so everything passes and the model's usual done signal arrives early."]},
-  {id:"a1",type:"cond",label:"Decoy defect present",title:"A second real defect elsewhere also explains the reported symptom",detail:["Pattern A condition 1."]},
-  {id:"a2",type:"cond",label:"Fix restricts 'normal' use",title:"The correct fix restricts something the report presents as normal deployment",detail:["In Variant C the correct fix, refusing a second connection, was ruled out as something that “would break legitimate use”."]},
-  {id:"a3",type:"cond",label:"Needs concurrent repro",title:"Reproducing the bug needs a concurrent, multi-client setup",detail:["The model wrote no concurrent reproduction in 194 steps."]},
+  {id:&quot;WS&quot;,type:&quot;weak&quot;,label:&quot;Unreported sibling sites&quot;,title:&quot;Unreported sibling sites: the same flaw at several sites, one reported&quot;,r:14,
+   detail:[&quot;The same flaw exists at several sites and the report shows only one. The model fixes the reported site and misses the siblings.&quot;,&quot;This conflicts with the repeated-pattern strength (an access-control library in C and Python, an HTTP client&#x27;s 4 codecs, a serialiser, and a database driver&#x27;s 3 parsing paths). The sources used different setups: the knowledge-base failures come from a hinted harness and from injected siblings, while the strength comes from impact-only agentic runs. The same database driver project appears on both sides, so a rerun is needed to settle it.&quot;],
+   meta:[[&quot;Models&quot;,&quot;Model A&quot;],[&quot;KB status&quot;,&quot;supported&quot;],[&quot;Miner weight&quot;,&quot;+1.5&quot;],[&quot;Detect rule&quot;,&quot;≥ 2 repeated fix sites&quot;],[&quot;Evidence&quot;,&quot;5 runs, 5 failures&quot;],[&quot;Updated&quot;,&quot;2026-10-15&quot;]]},
+  {id:&quot;WK&quot;,type:&quot;weak&quot;,label:&quot;Stacked vulnerabilities&quot;,title:&quot;Stacked vulnerabilities: several independent bugs in one task&quot;,r:14,
+   detail:[&quot;Several distinct vulnerabilities in one task. The model fixes one, assumes it is done and stops, or runs out of time.&quot;,&quot;Caveat: 2 of the 3 failures hit a 60-minute limit and still need 120-minute reruns, so only 1 failure so far is a clear early stop. The controlled study ran with no time limit.&quot;],
+   meta:[[&quot;Models&quot;,&quot;Model B&quot;],[&quot;KB status&quot;,&quot;supported&quot;],[&quot;Miner weight&quot;,&quot;+1.0&quot;],[&quot;Detect rule&quot;,&quot;≥ 2 advisories in the same repo&quot;],[&quot;Evidence&quot;,&quot;7 runs, 3 failures&quot;],[&quot;Updated&quot;,&quot;2026-10-15&quot;]]},
+  {id:&quot;WX&quot;,type:&quot;strength&quot;,label:&quot;Single explicit check (anti-weakness)&quot;,title:&quot;Anti-weakness: one missing check in one place&quot;,
+   detail:[&quot;Both models solve these, especially when the report names the check. The miner subtracts points so such candidates rank lower.&quot;],
+   meta:[[&quot;Models&quot;,&quot;Model A and Model B&quot;],[&quot;KB status&quot;,&quot;supported&quot;],[&quot;Miner weight&quot;,&quot;−1.0&quot;],[&quot;Detect rule&quot;,&quot;1 source file and ≤ 2 hunks&quot;],[&quot;Evidence&quot;,&quot;8 runs, 0 failures&quot;]]},
+  {id:&quot;cs&quot;,type:&quot;cond&quot;,label:&quot;Same change at ≥ 2 sites&quot;,title:&quot;The upstream fix repeats the same change at 2 or more separate sites&quot;,detail:[&quot;Different functions or files, with only one site described in the report.&quot;]},
+  {id:&quot;ck&quot;,type:&quot;cond&quot;,label:&quot;≥ 2 independent bugs&quot;,title:&quot;The task requires fixing 2 or more independent vulnerabilities&quot;,detail:[&quot;The miner detects this as 2 or more advisories in the same repository.&quot;]},
+  {id:&quot;cx&quot;,type:&quot;cond&quot;,label:&quot;1 file, ≤ 2 hunks&quot;,title:&quot;The fix is 1 source file with at most 2 hunks, or the advisory title states the missing check&quot;,detail:[&quot;When this holds, both models solve the task.&quot;]},
+  {id:&quot;fdrv&quot;,type:&quot;find&quot;,label:&quot;Driver: encoded variants missed&quot;,title:&quot;Database driver (hinted harness): fixed the reported path, still accepted encoded variants&quot;,detail:[&quot;2026-10-14. The model fixed the reported decoding path but still accepted encoded variants.&quot;],meta:[[&quot;Runs&quot;,&quot;2&quot;],[&quot;Failures&quot;,&quot;2&quot;],[&quot;Harness&quot;,&quot;hinted&quot;]]},
+  {id:&quot;finj&quot;,type:&quot;find&quot;,label:&quot;Injected siblings: 3/3 missed&quot;,title:&quot;Java data-binding library with injected siblings: the same 3 missed every run&quot;,detail:[&quot;The same 3 injected sibling sites were missed in all 3 runs.&quot;],meta:[[&quot;Runs&quot;,&quot;3&quot;],[&quot;Failures&quot;,&quot;3&quot;]]},
+  {id:&quot;fstk&quot;,type:&quot;find&quot;,label:&quot;Stacking track: 3 of 7 failed&quot;,title:&quot;Stacking track: 3 failures in 7 runs&quot;,detail:[&quot;A budgeting app stopped early. An SSH library and a third project ran out of the 60-minute limit and need 120-minute reruns.&quot;],meta:[[&quot;Runs&quot;,&quot;7&quot;],[&quot;Failures&quot;,&quot;3&quot;],[&quot;Clear early stop&quot;,&quot;1&quot;],[&quot;Timeouts&quot;,&quot;2&quot;]]},
+  {id:&quot;fsgl&quot;,type:&quot;find&quot;,label:&quot;Single checks: 0 of 8 failed&quot;,title:&quot;Single-check tasks: no failures for either model&quot;,detail:[&quot;A JWT signature task: both models solved it 3/3 in agentic runs. A Python web-toolkit advisory: both reproduced the upstream line in a manual review.&quot;],meta:[[&quot;Runs&quot;,&quot;8&quot;],[&quot;Failures&quot;,&quot;0&quot;]]},
+  {id:&quot;c1&quot;,type:&quot;cond&quot;,label:&quot;Check + producer fix&quot;,title:&quot;The fix needs a data-producer change as well as the check&quot;,detail:[&quot;The producer is a schema, serializer, parser, loader or normaliser. All four conditions must hold for the primary weakness to trigger.&quot;]},
+  {id:&quot;c2&quot;,type:&quot;cond&quot;,label:&quot;Save/load boundary&quot;,title:&quot;The producer drops the field across a time or storage boundary&quot;,detail:[&quot;Data saved now and loaded later, rather than a direct call from the check. When the check calls the producer directly with a straightforward data flow (the Go role-escalation task), the model does not fail.&quot;]},
+  {id:&quot;c3&quot;,type:&quot;cond&quot;,label:&quot;Report covers check path only&quot;,title:&quot;The report describes the impact through the check&#x27;s path only&quot;,detail:[&quot;The second path is not described concretely. One sentence describing it is enough to flip the result (Variant B2, 3/3).&quot;]},
+  {id:&quot;c4&quot;,type:&quot;cond&quot;,label:&quot;Tests pass either way&quot;,title:&quot;Existing repository tests pass whether or not the producer is fixed&quot;,detail:[&quot;In the agent-protocol SDK: about 980 tests plus typecheck and lint. None save and reload a credential, so everything passes and the model&#x27;s usual done signal arrives early.&quot;]},
+  {id:&quot;a1&quot;,type:&quot;cond&quot;,label:&quot;Decoy defect present&quot;,title:&quot;A second real defect elsewhere also explains the reported symptom&quot;,detail:[&quot;Pattern A condition 1.&quot;]},
+  {id:&quot;a2&quot;,type:&quot;cond&quot;,label:&quot;Fix restricts &#x27;normal&#x27; use&quot;,title:&quot;The correct fix restricts something the report presents as normal deployment&quot;,detail:[&quot;In Variant C the correct fix, refusing a second connection, was ruled out as something that “would break legitimate use”.&quot;]},
+  {id:&quot;a3&quot;,type:&quot;cond&quot;,label:&quot;Needs concurrent repro&quot;,title:&quot;Reproducing the bug needs a concurrent, multi-client setup&quot;,detail:[&quot;The model wrote no concurrent reproduction in 194 steps.&quot;]},
 
-  {id:"f19",type:"find",label:"19/19 on the same 5 tests",title:"Every run in the primary shape failed on the same 5 tests",
-   detail:["All failures are on the 5 tests for credentials persisted by the application and validated on load with the SDK schemas. All functional tests pass."],
-   meta:[["Real task 1","3/3 · 0.64"],["Variant B","3/3 · 0.64"],["Variant B3","1/1 · 0.64"],["Variant S2only","3/3 · 0.0"],["Variant Breach","3/3 · 0.64"],["Variant D","1/1 · 0.55"],["Variant Bverify","3/3 · 0.64"],["Variant Baudit","3/3 · 0.64"],["Total","19 / 19"]]},
-  {id:"fknow",type:"find",label:"Not a knowledge gap",title:"Not a knowledge gap: it explains the bug when asked",detail:["Direct questions, no agent, 3 tries each: “issuer is removed” 3/3, and “the secret leaks” 3/3 with the correct explanation."]},
-  {id:"fskill",type:"find",label:"Not a skill gap",title:"Not a skill gap: one sentence pointing at the path is enough",detail:["In the 3 solved Variant B2 runs, the model joins “the schema strips issuer” and “saved credentials pass through the schema” into one thought early, at steps 12–24. It then fixes the schema, and in 2 of 3 runs writes its own save-and-reload check."]},
-  {id:"fnotice",type:"find",label:"It notices the risk",title:"It notices the risk during the task",detail:["Step-by-step reading of 12 failed runs."],meta:[["Noticed the strip","11 / 12"],["Thought about saved credentials","11 / 12"],["Both in the same run","10 / 12"]]},
-  {id:"fstop",type:"find",label:"Stops on existing tests",title:"What stops it: an assumption, then the existing tests",detail:["In every analysed failure it ran the existing ~980 repository tests, typecheck and lint, none of which save and reload a credential."],meta:[["Dismissed with an assumption","10 / 12"],["Tested a save-and-reload","0 / 12"],["Stopped on tests + typecheck + lint","12 / 12"]]},
-  {id:"fgeneric",type:"find",label:"Reminders don't help",title:"Generic reminders do not help",detail:["Variant Bverify (“do not rely on assumptions about how other code handles this data; check each against the code”) and Variant Baudit (“make sure the protection holds for every way credential data can reach the token request”) both failed 3/3. The model follows evidence, not reminders."],meta:[["Solved","0 / 6"]]},
-  {id:"ftest",type:"find",label:"Failing test flips it",title:"A concrete failing test flips the result",detail:["Variant Bvistest adds one visible failing save-and-reload test to the repository: solved 3/3. Caveat: the test also points at the schema. It needs an executable signal that contradicts its assumption."],meta:[["Solved","3 / 3"]]},
-  {id:"fcomments",type:"find",label:"Comments not the cause",title:"Misleading “intentional” comments are not the cause",detail:["Variant B3 removed every “intentional / backward compatible” code comment. Still failed (0.64)."]},
-  {id:"flocation",type:"find",label:"Location not the cause",title:"Where the code sits is not the cause",detail:["Variant Breach placed the stripping schema directly inside the token-request function, on the reported path. Still failed 3/3; it read the helper and schema dozens of times."]},
+  {id:&quot;f19&quot;,type:&quot;find&quot;,label:&quot;19/19 on the same 5 tests&quot;,title:&quot;Every run in the primary shape failed on the same 5 tests&quot;,
+   detail:[&quot;All failures are on the 5 tests for credentials persisted by the application and validated on load with the SDK schemas. All functional tests pass.&quot;],
+   meta:[[&quot;Real task 1&quot;,&quot;3/3 · 0.64&quot;],[&quot;Variant B&quot;,&quot;3/3 · 0.64&quot;],[&quot;Variant B3&quot;,&quot;1/1 · 0.64&quot;],[&quot;Variant S2only&quot;,&quot;3/3 · 0.0&quot;],[&quot;Variant Breach&quot;,&quot;3/3 · 0.64&quot;],[&quot;Variant D&quot;,&quot;1/1 · 0.55&quot;],[&quot;Variant Bverify&quot;,&quot;3/3 · 0.64&quot;],[&quot;Variant Baudit&quot;,&quot;3/3 · 0.64&quot;],[&quot;Total&quot;,&quot;19 / 19&quot;]]},
+  {id:&quot;fknow&quot;,type:&quot;find&quot;,label:&quot;Not a knowledge gap&quot;,title:&quot;Not a knowledge gap: it explains the bug when asked&quot;,detail:[&quot;Direct questions, no agent, 3 tries each: “issuer is removed” 3/3, and “the secret leaks” 3/3 with the correct explanation.&quot;]},
+  {id:&quot;fskill&quot;,type:&quot;find&quot;,label:&quot;Not a skill gap&quot;,title:&quot;Not a skill gap: one sentence pointing at the path is enough&quot;,detail:[&quot;In the 3 solved Variant B2 runs, the model joins “the schema strips issuer” and “saved credentials pass through the schema” into one thought early, at steps 12–24. It then fixes the schema, and in 2 of 3 runs writes its own save-and-reload check.&quot;]},
+  {id:&quot;fnotice&quot;,type:&quot;find&quot;,label:&quot;It notices the risk&quot;,title:&quot;It notices the risk during the task&quot;,detail:[&quot;Step-by-step reading of 12 failed runs.&quot;],meta:[[&quot;Noticed the strip&quot;,&quot;11 / 12&quot;],[&quot;Thought about saved credentials&quot;,&quot;11 / 12&quot;],[&quot;Both in the same run&quot;,&quot;10 / 12&quot;]]},
+  {id:&quot;fstop&quot;,type:&quot;find&quot;,label:&quot;Stops on existing tests&quot;,title:&quot;What stops it: an assumption, then the existing tests&quot;,detail:[&quot;In every analysed failure it ran the existing ~980 repository tests, typecheck and lint, none of which save and reload a credential.&quot;],meta:[[&quot;Dismissed with an assumption&quot;,&quot;10 / 12&quot;],[&quot;Tested a save-and-reload&quot;,&quot;0 / 12&quot;],[&quot;Stopped on tests + typecheck + lint&quot;,&quot;12 / 12&quot;]]},
+  {id:&quot;fgeneric&quot;,type:&quot;find&quot;,label:&quot;Reminders don&#x27;t help&quot;,title:&quot;Generic reminders do not help&quot;,detail:[&quot;Variant Bverify (“do not rely on assumptions about how other code handles this data; check each against the code”) and Variant Baudit (“make sure the protection holds for every way credential data can reach the token request”) both failed 3/3. The model follows evidence, not reminders.&quot;],meta:[[&quot;Solved&quot;,&quot;0 / 6&quot;]]},
+  {id:&quot;ftest&quot;,type:&quot;find&quot;,label:&quot;Failing test flips it&quot;,title:&quot;A concrete failing test flips the result&quot;,detail:[&quot;Variant Bvistest adds one visible failing save-and-reload test to the repository: solved 3/3. Caveat: the test also points at the schema. It needs an executable signal that contradicts its assumption.&quot;],meta:[[&quot;Solved&quot;,&quot;3 / 3&quot;]]},
+  {id:&quot;fcomments&quot;,type:&quot;find&quot;,label:&quot;Comments not the cause&quot;,title:&quot;Misleading “intentional” comments are not the cause&quot;,detail:[&quot;Variant B3 removed every “intentional / backward compatible” code comment. Still failed (0.64).&quot;]},
+  {id:&quot;flocation&quot;,type:&quot;find&quot;,label:&quot;Location not the cause&quot;,title:&quot;Where the code sits is not the cause&quot;,detail:[&quot;Variant Breach placed the stripping schema directly inside the token-request function, on the reported path. Still failed 3/3; it read the helper and schema dozens of times.&quot;]},
 
-  {id:"r1",type:"reason",label:"“App keeps the issuer”",title:"“The application/provider keeps the issuer when saving”",detail:["Given in 10 of the 12 analysed failed runs. One run can give several reasons."]},
-  {id:"r2",type:"reason",label:"“Strip only hits network input”",title:"“The strip only affects network input”",detail:["Given in 7 of the 12 analysed failed runs."]},
-  {id:"r3",type:"reason",label:"“Type already has issuer”",title:"“The type definition already includes issuer”",detail:["Given in 4 of the 12 analysed failed runs."]},
-  {id:"r4",type:"reason",label:"“Out of scope”",title:"“Out of scope”",detail:["Given in 2 of the 12 analysed failed runs."]},
-  {id:"r5",type:"reason",label:"“Backward compatibility”",title:"“Backward compatibility”",detail:["Given in 2 of the 12 analysed failed runs."]},
+  {id:&quot;r1&quot;,type:&quot;reason&quot;,label:&quot;“App keeps the issuer”&quot;,title:&quot;“The application/provider keeps the issuer when saving”&quot;,detail:[&quot;Given in 10 of the 12 analysed failed runs. One run can give several reasons.&quot;]},
+  {id:&quot;r2&quot;,type:&quot;reason&quot;,label:&quot;“Strip only hits network input”&quot;,title:&quot;“The strip only affects network input”&quot;,detail:[&quot;Given in 7 of the 12 analysed failed runs.&quot;]},
+  {id:&quot;r3&quot;,type:&quot;reason&quot;,label:&quot;“Type already has issuer”&quot;,title:&quot;“The type definition already includes issuer”&quot;,detail:[&quot;Given in 4 of the 12 analysed failed runs.&quot;]},
+  {id:&quot;r4&quot;,type:&quot;reason&quot;,label:&quot;“Out of scope”&quot;,title:&quot;“Out of scope”&quot;,detail:[&quot;Given in 2 of the 12 analysed failed runs.&quot;]},
+  {id:&quot;r5&quot;,type:&quot;reason&quot;,label:&quot;“Backward compatibility”&quot;,title:&quot;“Backward compatibility”&quot;,detail:[&quot;Given in 2 of the 12 analysed failed runs.&quot;]},
 
-  {id:"ksdk",type:"code",label:"Widely used agent-protocol SDK",title:"A widely used agent-protocol SDK",r:11,detail:["Real repository for Real task 1. All variants use the same healthy snapshot with the real upstream fix put back in parts."]},
-  {id:"kcheck",type:"code",label:"Issuer check (F1)",title:"Issuer check on token requests (F1)",detail:["The OAuth client should send credentials only to the authorization server they belong to. If a credential has no issuer, the check allows it by design. The model fixed this in every attempt."]},
-  {id:"kschema",type:"code",label:"Credential validation schemas",title:"The client-information schema and the token schema",detail:["The SDK's own validation schemas drop unknown fields, so the issuer stamp is removed when an application loads saved credentials back through them. Left unchanged in all 3 real-task attempts."]},
-  {id:"kissuer",type:"code",label:"issuer stamp",title:"issuer field on each credential",detail:["Binds a credential to its authorization server. Once stripped, the check sees “no issuer” and a malicious tool server can collect the secret."]},
-  {id:"kfetch",type:"code",label:"Token-request function",title:"The token-request function",detail:["The function on the report's path: credentials are sent to the attacker's server through it."]},
-  {id:"kf2",type:"code",label:"Shared-server transport (F2)",title:"F2: a shared server instance's single transport is overwritten",detail:["One user's tool output is delivered to another user when one server instance is shared, because a second connection overwrites the transport. The model named this at step 31 of Variant C, then dismissed it."]},
-  {id:"kreqid",type:"code",label:"Request-ID collision (decoy)",title:"Request-ID collision in the shared transport",detail:["A real nearby bug. In Variant C the model built a large fix for it: passed the 2 shared-transport tests, failed all 4 shared-server tests."]},
+  {id:&quot;ksdk&quot;,type:&quot;code&quot;,label:&quot;Widely used agent-protocol SDK&quot;,title:&quot;A widely used agent-protocol SDK&quot;,r:11,detail:[&quot;Real repository for Real task 1. All variants use the same healthy snapshot with the real upstream fix put back in parts.&quot;]},
+  {id:&quot;kcheck&quot;,type:&quot;code&quot;,label:&quot;Issuer check (F1)&quot;,title:&quot;Issuer check on token requests (F1)&quot;,detail:[&quot;The OAuth client should send credentials only to the authorization server they belong to. If a credential has no issuer, the check allows it by design. The model fixed this in every attempt.&quot;]},
+  {id:&quot;kschema&quot;,type:&quot;code&quot;,label:&quot;Credential validation schemas&quot;,title:&quot;The client-information schema and the token schema&quot;,detail:[&quot;The SDK&#x27;s own validation schemas drop unknown fields, so the issuer stamp is removed when an application loads saved credentials back through them. Left unchanged in all 3 real-task attempts.&quot;]},
+  {id:&quot;kissuer&quot;,type:&quot;code&quot;,label:&quot;issuer stamp&quot;,title:&quot;issuer field on each credential&quot;,detail:[&quot;Binds a credential to its authorization server. Once stripped, the check sees “no issuer” and a malicious tool server can collect the secret.&quot;]},
+  {id:&quot;kfetch&quot;,type:&quot;code&quot;,label:&quot;Token-request function&quot;,title:&quot;The token-request function&quot;,detail:[&quot;The function on the report&#x27;s path: credentials are sent to the attacker&#x27;s server through it.&quot;]},
+  {id:&quot;kf2&quot;,type:&quot;code&quot;,label:&quot;Shared-server transport (F2)&quot;,title:&quot;F2: a shared server instance&#x27;s single transport is overwritten&quot;,detail:[&quot;One user&#x27;s tool output is delivered to another user when one server instance is shared, because a second connection overwrites the transport. The model named this at step 31 of Variant C, then dismissed it.&quot;]},
+  {id:&quot;kreqid&quot;,type:&quot;code&quot;,label:&quot;Request-ID collision (decoy)&quot;,title:&quot;Request-ID collision in the shared transport&quot;,detail:[&quot;A real nearby bug. In Variant C the model built a large fix for it: passed the 2 shared-transport tests, failed all 4 shared-server tests.&quot;]},
 
   // real tasks
-  {id:"t1",type:"task",label:"Added the missing signature check",title:"Added the missing JWT signature check",task:"Python auth library: JWT signature bypass",status:"solved",score:"3/3",detail:["Python. Fix needs one missing signature check."],real:true},
-  {id:"t2",type:"task",label:"Blocked file:// redirects",title:"Added a scheme check that blocks redirects to file://",task:"Python streaming tool: redirect to file://",status:"solved",score:"3/3",detail:["Python. Fix needs a scheme check on redirects."],real:true},
-  {id:"t3",type:"task",label:"Verified bundled wheels",title:"Added integrity verification for bundled wheels",task:"Python environment tool: bundled-wheel integrity",status:"solved",detail:["Python. Fix needs integrity verification of bundled wheels."],real:true},
-  {id:"t4",type:"task",label:"Limited trailer parsing",title:"Added limits to chunked-trailer parsing",task:"Python web server: chunked-trailer smuggling",status:"solved",detail:["Python. Fix needs trailer parsing limits."],real:true},
-  {id:"t5",type:"task",label:"Guarded both C and Python code",title:"Added the guard to both the C and the Python implementation",task:"Python access-control library: format-string disclosure",status:"solved",detail:["Python + C. Fix needs a guard in both the C and the Python implementation."],real:true},
-  {id:"t6",type:"task",label:"Capped async number length",title:"Added a number-length limit to the async parser",task:"Java JSON parser: async number length",status:"solved",detail:["Java. Fix needs a length limit in the async parser."],real:true},
-  {id:"t7",type:"task",label:"Checked every deserialiser",title:"Added length checks to all adjacent deserialisers",task:"JavaScript serialiser: typed-array length DoS",status:"solved",detail:["JavaScript. Fix needs length checks at adjacent deserialisers."],real:true},
-  {id:"t8",type:"task",label:"Limited all 4 codecs",title:"Added chunk limits to all 4 codecs, sync and async",task:"Python HTTP client: decompression chunk DoS",status:"solved",detail:["Python. Fix needs chunk limits in 4 codecs, sync and async."],real:true},
-  {id:"t9",type:"task",label:"Left the issuer-stripping schemas",title:"Fixed the issuer check but left the schemas that strip issuer",task:"Real task 1: widely used agent-protocol SDK, OAuth issuer confusion",status:"failed",score:"0.64 ×3",r:12,real:true,
-   detail:["The fix needs (a) an issuer check on token requests and (b) changes to the core validation schemas that strip issuer. The model fixed the check in all 3 attempts and left the schemas unchanged in all 3. pass@3 = 0."]},
-  {id:"t10",type:"task",label:"Fixed check and role loader",title:"Fixed both the permission middleware and the role loader",task:"Go DevOps web app: custom-role escalation",status:"solved",score:"3/3",r:10,real:true,
-   detail:["Go. Fix needs (a) permission middleware and (b) a role loader scoped to the project. Contrast case: the loader is called by the check and the data flow is direct, so the primary weakness does not apply."]},
+  {id:&quot;t1&quot;,type:&quot;task&quot;,label:&quot;Added the missing signature check&quot;,title:&quot;Added the missing JWT signature check&quot;,task:&quot;Python auth library: JWT signature bypass&quot;,status:&quot;solved&quot;,score:&quot;3/3&quot;,detail:[&quot;Python. Fix needs one missing signature check.&quot;],real:true},
+  {id:&quot;t2&quot;,type:&quot;task&quot;,label:&quot;Blocked file:// redirects&quot;,title:&quot;Added a scheme check that blocks redirects to file://&quot;,task:&quot;Python streaming tool: redirect to file://&quot;,status:&quot;solved&quot;,score:&quot;3/3&quot;,detail:[&quot;Python. Fix needs a scheme check on redirects.&quot;],real:true},
+  {id:&quot;t3&quot;,type:&quot;task&quot;,label:&quot;Verified bundled wheels&quot;,title:&quot;Added integrity verification for bundled wheels&quot;,task:&quot;Python environment tool: bundled-wheel integrity&quot;,status:&quot;solved&quot;,detail:[&quot;Python. Fix needs integrity verification of bundled wheels.&quot;],real:true},
+  {id:&quot;t4&quot;,type:&quot;task&quot;,label:&quot;Limited trailer parsing&quot;,title:&quot;Added limits to chunked-trailer parsing&quot;,task:&quot;Python web server: chunked-trailer smuggling&quot;,status:&quot;solved&quot;,detail:[&quot;Python. Fix needs trailer parsing limits.&quot;],real:true},
+  {id:&quot;t5&quot;,type:&quot;task&quot;,label:&quot;Guarded both C and Python code&quot;,title:&quot;Added the guard to both the C and the Python implementation&quot;,task:&quot;Python access-control library: format-string disclosure&quot;,status:&quot;solved&quot;,detail:[&quot;Python + C. Fix needs a guard in both the C and the Python implementation.&quot;],real:true},
+  {id:&quot;t6&quot;,type:&quot;task&quot;,label:&quot;Capped async number length&quot;,title:&quot;Added a number-length limit to the async parser&quot;,task:&quot;Java JSON parser: async number length&quot;,status:&quot;solved&quot;,detail:[&quot;Java. Fix needs a length limit in the async parser.&quot;],real:true},
+  {id:&quot;t7&quot;,type:&quot;task&quot;,label:&quot;Checked every deserialiser&quot;,title:&quot;Added length checks to all adjacent deserialisers&quot;,task:&quot;JavaScript serialiser: typed-array length DoS&quot;,status:&quot;solved&quot;,detail:[&quot;JavaScript. Fix needs length checks at adjacent deserialisers.&quot;],real:true},
+  {id:&quot;t8&quot;,type:&quot;task&quot;,label:&quot;Limited all 4 codecs&quot;,title:&quot;Added chunk limits to all 4 codecs, sync and async&quot;,task:&quot;Python HTTP client: decompression chunk DoS&quot;,status:&quot;solved&quot;,detail:[&quot;Python. Fix needs chunk limits in 4 codecs, sync and async.&quot;],real:true},
+  {id:&quot;t9&quot;,type:&quot;task&quot;,label:&quot;Left the issuer-stripping schemas&quot;,title:&quot;Fixed the issuer check but left the schemas that strip issuer&quot;,task:&quot;Real task 1: widely used agent-protocol SDK, OAuth issuer confusion&quot;,status:&quot;failed&quot;,score:&quot;0.64 ×3&quot;,r:12,real:true,
+   detail:[&quot;The fix needs (a) an issuer check on token requests and (b) changes to the core validation schemas that strip issuer. The model fixed the check in all 3 attempts and left the schemas unchanged in all 3. pass@3 = 0.&quot;]},
+  {id:&quot;t10&quot;,type:&quot;task&quot;,label:&quot;Fixed check and role loader&quot;,title:&quot;Fixed both the permission middleware and the role loader&quot;,task:&quot;Go DevOps web app: custom-role escalation&quot;,status:&quot;solved&quot;,score:&quot;3/3&quot;,r:10,real:true,
+   detail:[&quot;Go. Fix needs (a) permission middleware and (b) a role loader scoped to the project. Contrast case: the loader is called by the check and the data flow is direct, so the primary weakness does not apply.&quot;]},
   // variants
-  {id:"t11",type:"task",label:"Fixed the issuer check",title:"Fixed the issuer check when it was the only bug",task:"Variant A: F1 check only",status:"solved",score:"3/3",detail:["Report: credentials sent to the attacker's server via the token-request function. Shows the task is fair and solvable."]},
-  {id:"t12",type:"task",label:"Missed the schema strip",title:"Fixed the check, missed the schemas that strip issuer",task:"Variant B: F1 check + schemas that strip issuer",status:"failed",score:"0.64 ×3",r:10,detail:["Same report as A. Changing only the producer flips 3/3 solved into 3/3 failed, so the producer causes the failure. Parent of the isolation experiments."]},
-  {id:"t13",type:"task",label:"Fixed the schema once hinted",title:"Fixed the schema once one sentence pointed at save-and-reload",task:"Variant B2: B + one-sentence hint",status:"solved",score:"3/3",detail:["A's report plus one sentence describing save-and-reload through the SDK schemas."]},
-  {id:"t14",type:"task",label:"Missed strip without comments",title:"Still missed the schema strip with the “intentional” comments removed",task:"Variant B3: B with “intentional” comments removed",status:"failed",score:"0.64",detail:["Every “intentional / backward compatible” code comment removed. Report same as A. 1/1 failed."]},
-  {id:"t15",type:"task",label:"Missed the lone schema bug",title:"Could not find the schema strip when it was the only bug",task:"Variant S2only: schemas only (check already fixed)",status:"failed",score:"0.0 ×3",detail:["The schemas are the only bug. The model cannot find the producer when it is the only bug."]},
-  {id:"t16",type:"task",label:"Missed strip in token request",title:"Still missed the schema strip when it sat inside the token-request function",task:"Variant Breach: stripping schema inside the token-request function",status:"failed",score:"0.64 ×3",detail:["Same as B, plus the stripping schema placed directly inside the reported function."]},
-  {id:"t17",type:"task",label:"Ignored “check assumptions”",title:"Missed the schema strip despite a reminder to check assumptions",task:"Variant Bverify: B + “check your assumptions”",status:"failed",score:"0.64 ×3",detail:["Report adds: “do not rely on assumptions about how other code handles this data; check each against the code”."]},
-  {id:"t18",type:"task",label:"Ignored “cover every path”",title:"Missed the schema strip despite a reminder to cover every data path",task:"Variant Baudit: B + “cover every data path”",status:"failed",score:"0.64 ×3",detail:["Report adds: “make sure the protection holds for every way credential data can reach the token request”."]},
-  {id:"t19",type:"task",label:"Fixed schema after failing test",title:"Fixed the schema once a visible test failed on save-and-reload",task:"Variant Bvistest: B + one visible failing test",status:"solved",score:"3/3",detail:["Same as B, plus one visible failing save-and-reload test in the repository. Report same as A."]},
-  {id:"t20",type:"task",label:"Fixed decoy, missed shared server",title:"Fixed the request-ID decoy and left the shared-server bug open",task:"Variant C: F1 check + F2 cross-user output",status:"failed",score:"0.73, 0.73, 1.0",detail:["Failed 2 of 3 runs (0.73 and 0.73); one run solved it (1.0). Both bugs described in the report. In a failed run it named the real cause at step 31, dismissed it more than 10 times, and built a large fix for a request-ID collision instead."]},
-  {id:"t21",type:"task",label:"Missed schema and shared server",title:"Missed both the schema strip and the shared-server bug",task:"Variant D: B + F2",status:"failed",score:"0.55",detail:["Both described. Same miss as C, plus the primary weakness."]},
-  {id:"t22",type:"task",label:"Fixed the single-site bug",title:"Fixed the shared-server bug when it had one site and no decoy",task:"Variant E1: F2 at the one reported site",status:"solved",score:"1/1",detail:["F2 report. No alternative bug available: solved. Control for pattern A."]},
-  {id:"t23",type:"task",label:"Chased decoy across 3 sites",title:"Fixed the shared-transport decoy and left the 3 shared-server sites open",task:"Variant E3: F2 at all 3 sites",status:"failed",score:"0.33",detail:["Same F2 report. Fixed the shared-transport issue and left the reported shared-server case open."]},
-  {id:"t24a",type:"task",label:"Fixed tag-name injection",title:"Fixed option injection in tag creation",task:"Git wrapper S1: tag creation only",status:"solved",detail:["Report: tag creation with an attacker-influenced name makes git read an arbitrary file."]},
-  {id:"t24b",type:"task",label:"Missed 5 other injection gaps",title:"Fixed tag creation, missed 5 other option-injection gaps",task:"Git wrapper SN: 6 functions with option-injection gaps",status:"failed",score:"0.29",detail:["Same tag-creation report. Fixed tag creation; missed diff -O, index diff, blame --contents and --ignore-revs-file, and ls-remote --exec."]},
-  {id:"t25",type:"task",label:"Capped the DataInput parser",title:"Added the length limit to the DataInput parser",task:"Java JSON parser S1: DataInput parser limit only",status:"solved",detail:["Sibling parsers already safe. DataInput scenario in the report."]},
-  {id:"t26a",type:"task",label:"Fixed the slot leak",title:"Fixed the concurrency-slot leak on early stream end",task:"AI agent framework S1: concurrency-slot leak",status:"solved",detail:["Report: a concurrency-limited model keeps its slot when a streamed request ends early."]},
-  {id:"t26b",type:"task",label:"Missed shared-limiter deadlock",title:"Fixed the slot leak, missed the shared-limiter deadlock",task:"AI agent framework SN: leak + shared-limiter deadlock",status:"failed",score:"0.60",detail:["Same streamed-disconnect report. Fixed the slot leak; missed the deadlock when one limiter is shared by an agent and its model."]},
-  {id:"t27",type:"task",label:"Fixed the middleware",title:"Fixed the permission middleware when it was the only bug",task:"Role escalation A (control): middleware only",status:"solved",score:"1/1",detail:["Same report as the full role-escalation task."]},
+  {id:&quot;t11&quot;,type:&quot;task&quot;,label:&quot;Fixed the issuer check&quot;,title:&quot;Fixed the issuer check when it was the only bug&quot;,task:&quot;Variant A: F1 check only&quot;,status:&quot;solved&quot;,score:&quot;3/3&quot;,detail:[&quot;Report: credentials sent to the attacker&#x27;s server via the token-request function. Shows the task is fair and solvable.&quot;]},
+  {id:&quot;t12&quot;,type:&quot;task&quot;,label:&quot;Missed the schema strip&quot;,title:&quot;Fixed the check, missed the schemas that strip issuer&quot;,task:&quot;Variant B: F1 check + schemas that strip issuer&quot;,status:&quot;failed&quot;,score:&quot;0.64 ×3&quot;,r:10,detail:[&quot;Same report as A. Changing only the producer flips 3/3 solved into 3/3 failed, so the producer causes the failure. Parent of the isolation experiments.&quot;]},
+  {id:&quot;t13&quot;,type:&quot;task&quot;,label:&quot;Fixed the schema once hinted&quot;,title:&quot;Fixed the schema once one sentence pointed at save-and-reload&quot;,task:&quot;Variant B2: B + one-sentence hint&quot;,status:&quot;solved&quot;,score:&quot;3/3&quot;,detail:[&quot;A&#x27;s report plus one sentence describing save-and-reload through the SDK schemas.&quot;]},
+  {id:&quot;t14&quot;,type:&quot;task&quot;,label:&quot;Missed strip without comments&quot;,title:&quot;Still missed the schema strip with the “intentional” comments removed&quot;,task:&quot;Variant B3: B with “intentional” comments removed&quot;,status:&quot;failed&quot;,score:&quot;0.64&quot;,detail:[&quot;Every “intentional / backward compatible” code comment removed. Report same as A. 1/1 failed.&quot;]},
+  {id:&quot;t15&quot;,type:&quot;task&quot;,label:&quot;Missed the lone schema bug&quot;,title:&quot;Could not find the schema strip when it was the only bug&quot;,task:&quot;Variant S2only: schemas only (check already fixed)&quot;,status:&quot;failed&quot;,score:&quot;0.0 ×3&quot;,detail:[&quot;The schemas are the only bug. The model cannot find the producer when it is the only bug.&quot;]},
+  {id:&quot;t16&quot;,type:&quot;task&quot;,label:&quot;Missed strip in token request&quot;,title:&quot;Still missed the schema strip when it sat inside the token-request function&quot;,task:&quot;Variant Breach: stripping schema inside the token-request function&quot;,status:&quot;failed&quot;,score:&quot;0.64 ×3&quot;,detail:[&quot;Same as B, plus the stripping schema placed directly inside the reported function.&quot;]},
+  {id:&quot;t17&quot;,type:&quot;task&quot;,label:&quot;Ignored “check assumptions”&quot;,title:&quot;Missed the schema strip despite a reminder to check assumptions&quot;,task:&quot;Variant Bverify: B + “check your assumptions”&quot;,status:&quot;failed&quot;,score:&quot;0.64 ×3&quot;,detail:[&quot;Report adds: “do not rely on assumptions about how other code handles this data; check each against the code”.&quot;]},
+  {id:&quot;t18&quot;,type:&quot;task&quot;,label:&quot;Ignored “cover every path”&quot;,title:&quot;Missed the schema strip despite a reminder to cover every data path&quot;,task:&quot;Variant Baudit: B + “cover every data path”&quot;,status:&quot;failed&quot;,score:&quot;0.64 ×3&quot;,detail:[&quot;Report adds: “make sure the protection holds for every way credential data can reach the token request”.&quot;]},
+  {id:&quot;t19&quot;,type:&quot;task&quot;,label:&quot;Fixed schema after failing test&quot;,title:&quot;Fixed the schema once a visible test failed on save-and-reload&quot;,task:&quot;Variant Bvistest: B + one visible failing test&quot;,status:&quot;solved&quot;,score:&quot;3/3&quot;,detail:[&quot;Same as B, plus one visible failing save-and-reload test in the repository. Report same as A.&quot;]},
+  {id:&quot;t20&quot;,type:&quot;task&quot;,label:&quot;Fixed decoy, missed shared server&quot;,title:&quot;Fixed the request-ID decoy and left the shared-server bug open&quot;,task:&quot;Variant C: F1 check + F2 cross-user output&quot;,status:&quot;failed&quot;,score:&quot;0.73, 0.73, 1.0&quot;,detail:[&quot;Failed 2 of 3 runs (0.73 and 0.73); one run solved it (1.0). Both bugs described in the report. In a failed run it named the real cause at step 31, dismissed it more than 10 times, and built a large fix for a request-ID collision instead.&quot;]},
+  {id:&quot;t21&quot;,type:&quot;task&quot;,label:&quot;Missed schema and shared server&quot;,title:&quot;Missed both the schema strip and the shared-server bug&quot;,task:&quot;Variant D: B + F2&quot;,status:&quot;failed&quot;,score:&quot;0.55&quot;,detail:[&quot;Both described. Same miss as C, plus the primary weakness.&quot;]},
+  {id:&quot;t22&quot;,type:&quot;task&quot;,label:&quot;Fixed the single-site bug&quot;,title:&quot;Fixed the shared-server bug when it had one site and no decoy&quot;,task:&quot;Variant E1: F2 at the one reported site&quot;,status:&quot;solved&quot;,score:&quot;1/1&quot;,detail:[&quot;F2 report. No alternative bug available: solved. Control for pattern A.&quot;]},
+  {id:&quot;t23&quot;,type:&quot;task&quot;,label:&quot;Chased decoy across 3 sites&quot;,title:&quot;Fixed the shared-transport decoy and left the 3 shared-server sites open&quot;,task:&quot;Variant E3: F2 at all 3 sites&quot;,status:&quot;failed&quot;,score:&quot;0.33&quot;,detail:[&quot;Same F2 report. Fixed the shared-transport issue and left the reported shared-server case open.&quot;]},
+  {id:&quot;t24a&quot;,type:&quot;task&quot;,label:&quot;Fixed tag-name injection&quot;,title:&quot;Fixed option injection in tag creation&quot;,task:&quot;Git wrapper S1: tag creation only&quot;,status:&quot;solved&quot;,detail:[&quot;Report: tag creation with an attacker-influenced name makes git read an arbitrary file.&quot;]},
+  {id:&quot;t24b&quot;,type:&quot;task&quot;,label:&quot;Missed 5 other injection gaps&quot;,title:&quot;Fixed tag creation, missed 5 other option-injection gaps&quot;,task:&quot;Git wrapper SN: 6 functions with option-injection gaps&quot;,status:&quot;failed&quot;,score:&quot;0.29&quot;,detail:[&quot;Same tag-creation report. Fixed tag creation; missed diff -O, index diff, blame --contents and --ignore-revs-file, and ls-remote --exec.&quot;]},
+  {id:&quot;t25&quot;,type:&quot;task&quot;,label:&quot;Capped the DataInput parser&quot;,title:&quot;Added the length limit to the DataInput parser&quot;,task:&quot;Java JSON parser S1: DataInput parser limit only&quot;,status:&quot;solved&quot;,detail:[&quot;Sibling parsers already safe. DataInput scenario in the report.&quot;]},
+  {id:&quot;t26a&quot;,type:&quot;task&quot;,label:&quot;Fixed the slot leak&quot;,title:&quot;Fixed the concurrency-slot leak on early stream end&quot;,task:&quot;AI agent framework S1: concurrency-slot leak&quot;,status:&quot;solved&quot;,detail:[&quot;Report: a concurrency-limited model keeps its slot when a streamed request ends early.&quot;]},
+  {id:&quot;t26b&quot;,type:&quot;task&quot;,label:&quot;Missed shared-limiter deadlock&quot;,title:&quot;Fixed the slot leak, missed the shared-limiter deadlock&quot;,task:&quot;AI agent framework SN: leak + shared-limiter deadlock&quot;,status:&quot;failed&quot;,score:&quot;0.60&quot;,detail:[&quot;Same streamed-disconnect report. Fixed the slot leak; missed the deadlock when one limiter is shared by an agent and its model.&quot;]},
+  {id:&quot;t27&quot;,type:&quot;task&quot;,label:&quot;Fixed the middleware&quot;,title:&quot;Fixed the permission middleware when it was the only bug&quot;,task:&quot;Role escalation A (control): middleware only&quot;,status:&quot;solved&quot;,score:&quot;1/1&quot;,detail:[&quot;Same report as the full role-escalation task.&quot;]},
 
-  {id:"s1",type:"strength",label:"Never breaks functionality",title:"Never breaks legitimate functionality",detail:["0 functional-test failures across all graded runs. Its fixes are conservative."]},
-  {id:"s2",type:"strength",label:"Repeated-pattern fixes",title:"Strong on single-location and repeated-pattern fixes",detail:["Finds repeated copies of the same flaw across files and languages: an access-control library in both C and Python, a database driver with 3 parsing paths, an HTTP client with 4 codecs sync and async, and a serialiser with adjacent deserialisers.","The weakness knowledge base records the opposite for sibling sites in other setups; see Unreported sibling sites."]},
-  {id:"s3",type:"strength",label:"Follows a named path",title:"Strong when the report names the path",detail:["Even abstractly, in one sentence (Variant B2)."]},
-  {id:"s4",type:"strength",label:"Traces call graphs",title:"Traces call graphs well",detail:["Finds every function that calls into the check and every function the check calls (the Go role-escalation task)."]},
-  {id:"s5",type:"strength",label:"Persistent",title:"Persistent",detail:["Runs of 100–200 steps with no timeouts."]},
+  {id:&quot;s1&quot;,type:&quot;strength&quot;,label:&quot;Never breaks functionality&quot;,title:&quot;Never breaks legitimate functionality&quot;,detail:[&quot;0 functional-test failures across all graded runs. Its fixes are conservative.&quot;]},
+  {id:&quot;s2&quot;,type:&quot;strength&quot;,label:&quot;Repeated-pattern fixes&quot;,title:&quot;Strong on single-location and repeated-pattern fixes&quot;,detail:[&quot;Finds repeated copies of the same flaw across files and languages: an access-control library in both C and Python, a database driver with 3 parsing paths, an HTTP client with 4 codecs sync and async, and a serialiser with adjacent deserialisers.&quot;,&quot;The weakness knowledge base records the opposite for sibling sites in other setups; see Unreported sibling sites.&quot;]},
+  {id:&quot;s3&quot;,type:&quot;strength&quot;,label:&quot;Follows a named path&quot;,title:&quot;Strong when the report names the path&quot;,detail:[&quot;Even abstractly, in one sentence (Variant B2).&quot;]},
+  {id:&quot;s4&quot;,type:&quot;strength&quot;,label:&quot;Traces call graphs&quot;,title:&quot;Traces call graphs well&quot;,detail:[&quot;Finds every function that calls into the check and every function the check calls (the Go role-escalation task).&quot;]},
+  {id:&quot;s5&quot;,type:&quot;strength&quot;,label:&quot;Persistent&quot;,title:&quot;Persistent&quot;,detail:[&quot;Runs of 100–200 steps with no timeouts.&quot;]},
 
-  {id:"d1",type:"design",label:"Producer + check sites",title:"Ingredient 1: a data-producer site plus a check site",detail:["The producer transforms or drops the security field across a save/load or serialize/parse boundary, not through a direct call from the check. Rare in real advisories: roughly 5 of 45 multi-file fixes reviewed had this shape."]},
-  {id:"d2",type:"design",label:"Report leads to the check",title:"Ingredient 2: an impact-only report that leads to the check",detail:["The report does not describe the second path concretely."]},
-  {id:"d3",type:"design",label:"Early “done” signal",title:"Ingredient 3: repository tests that pass either way",detail:["Its usual done signal is reached early."]},
-  {id:"d4",type:"design",label:"Optional decoy defect",title:"Ingredient 4 (optional): a nearby real defect explaining the same symptom",detail:["With a correct fix that restricts something presented as normal."]},
-  {id:"dsafe",type:"design",label:"Task-quality safeguards",title:"Task-quality safeguards",detail:["Tests check outcomes, never error text or internal names. Test setup never depends on code the model may legitimately harden. Every task is validated with the real fix (1.0, twice) and with no change (0.0)."]},
-  {id:"dnext",type:"design",label:"Next: second real repo",title:"In progress: a second real repository with the primary-weakness shape",detail:["Goal: reach pass@3 = 0 on another codebase."]},
+  {id:&quot;d1&quot;,type:&quot;design&quot;,label:&quot;Producer + check sites&quot;,title:&quot;Ingredient 1: a data-producer site plus a check site&quot;,detail:[&quot;The producer transforms or drops the security field across a save/load or serialize/parse boundary, not through a direct call from the check. Rare in real advisories: roughly 5 of 45 multi-file fixes reviewed had this shape.&quot;]},
+  {id:&quot;d2&quot;,type:&quot;design&quot;,label:&quot;Report leads to the check&quot;,title:&quot;Ingredient 2: an impact-only report that leads to the check&quot;,detail:[&quot;The report does not describe the second path concretely.&quot;]},
+  {id:&quot;d3&quot;,type:&quot;design&quot;,label:&quot;Early “done” signal&quot;,title:&quot;Ingredient 3: repository tests that pass either way&quot;,detail:[&quot;Its usual done signal is reached early.&quot;]},
+  {id:&quot;d4&quot;,type:&quot;design&quot;,label:&quot;Optional decoy defect&quot;,title:&quot;Ingredient 4 (optional): a nearby real defect explaining the same symptom&quot;,detail:[&quot;With a correct fix that restricts something presented as normal.&quot;]},
+  {id:&quot;dsafe&quot;,type:&quot;design&quot;,label:&quot;Task-quality safeguards&quot;,title:&quot;Task-quality safeguards&quot;,detail:[&quot;Tests check outcomes, never error text or internal names. Test setup never depends on code the model may legitimately harden. Every task is validated with the real fix (1.0, twice) and with no change (0.0).&quot;]},
+  {id:&quot;dnext&quot;,type:&quot;design&quot;,label:&quot;Next: second real repo&quot;,title:&quot;In progress: a second real repository with the primary-weakness shape&quot;,detail:[&quot;Goal: reach pass@3 = 0 on another codebase.&quot;]},
 
-  {id:"mharness",type:"method",label:"Harbor terminus-2 harness",title:"Harness",detail:["Harbor 0.24.0 with the terminus-2 agent; the model works in a Docker container through a terminal. No network inside the task container. No time limit, and no run timed out.","Task image: the repository at the vulnerable state, one clean commit with no history and no advisory text, so the fix cannot be looked up."]},
-  {id:"mreport",type:"method",label:"Impact-only report",title:"Report given to the model",detail:["Impact-only: what an attacker can do, with no fix location, file names or payload.","Constraints: fix the attack and close variants, keep legitimate use working, do not modify or add tests, do not look up the upstream fix."]},
-  {id:"mtests",type:"method",label:"Hidden tests",title:"Hidden tests",detail:["Added only after the model stops. Security tests fail on vulnerable code and pass on a correct fix, and check outcomes, never error text. Functional tests make sure legitimate behaviour still works."]},
-  {id:"mscore",type:"method",label:"Score & acceptance",title:"Scoring and acceptance bar",detail:["Score = security tests passed ÷ total, or 0 if any functional test fails. Any score below 1.0 is a failure.","Acceptance: all 3 attempts below 1.0 (pass@3 = 0). Validation: the real upstream fix scores 1.0 twice, no change scores 0.0."]},
-  {id:"mrepro",type:"method",label:"Reproduction bundle",title:"Reproduction bundle",detail:["The reproduction bundle holds the real task, its hidden tests, the official fix, all 3 runs (step logs, terminal recordings, per-test results) and a setup checker, with step-by-step re-run instructions."]},
-  {id:"mkb",type:"method",label:"Weakness knowledge base",title:"Weakness knowledge base",detail:["One entry per weakness, each with the models it affects, a trigger, evidence, a miner weight and a detection rule.","Lifecycle: a weakness starts as a hypothesis, becomes supported once controlled experiments show it, and is proven once a holdout of real tasks confirms it. Rejected entries are ignored."],meta:[["Entries","3"],["Supported","3"],["Proven","0"]]},
-  {id:"mmine",type:"method",label:"Candidate miner",title:"Candidate miner",detail:["Scores candidate advisories with every weakness that is not rejected, adding that weakness's weight when its detection rule matches the real fix. Rules can check repeated fix sites, file, directory, function and hunk counts, summary text, CWEs, languages and advisories per repo."]},
-  {id:"dgap",type:"design",label:"Gap: primary weakness not in KB",title:"Gap: the primary weakness is missing from the knowledge base",detail:["The best-evidenced weakness, a check plus a data producer across a save/load boundary (19/19 failures, pass@3 = 0 on a real repository), has no knowledge-base entry, so the miner does not score candidates for it. Patterns A, B and C are missing too.","Ingredient 1 already describes a detection rule: a fix that touches both a check and a schema, serializer, parser or loader. Under the knowledge base's lifecycle it would enter as supported, and the second real repository in progress would make it proven."]},
+  {id:&quot;mharness&quot;,type:&quot;method&quot;,label:&quot;Harbor terminus-2 harness&quot;,title:&quot;Harness&quot;,detail:[&quot;Harbor 0.24.0 with the terminus-2 agent; the model works in a Docker container through a terminal. No network inside the task container. No time limit, and no run timed out.&quot;,&quot;Task image: the repository at the vulnerable state, one clean commit with no history and no advisory text, so the fix cannot be looked up.&quot;]},
+  {id:&quot;mreport&quot;,type:&quot;method&quot;,label:&quot;Impact-only report&quot;,title:&quot;Report given to the model&quot;,detail:[&quot;Impact-only: what an attacker can do, with no fix location, file names or payload.&quot;,&quot;Constraints: fix the attack and close variants, keep legitimate use working, do not modify or add tests, do not look up the upstream fix.&quot;]},
+  {id:&quot;mtests&quot;,type:&quot;method&quot;,label:&quot;Hidden tests&quot;,title:&quot;Hidden tests&quot;,detail:[&quot;Added only after the model stops. Security tests fail on vulnerable code and pass on a correct fix, and check outcomes, never error text. Functional tests make sure legitimate behaviour still works.&quot;]},
+  {id:&quot;mscore&quot;,type:&quot;method&quot;,label:&quot;Score &amp; acceptance&quot;,title:&quot;Scoring and acceptance bar&quot;,detail:[&quot;Score = security tests passed ÷ total, or 0 if any functional test fails. Any score below 1.0 is a failure.&quot;,&quot;Acceptance: all 3 attempts below 1.0 (pass@3 = 0). Validation: the real upstream fix scores 1.0 twice, no change scores 0.0.&quot;]},
+  {id:&quot;mrepro&quot;,type:&quot;method&quot;,label:&quot;Reproduction bundle&quot;,title:&quot;Reproduction bundle&quot;,detail:[&quot;The reproduction bundle holds the real task, its hidden tests, the official fix, all 3 runs (step logs, terminal recordings, per-test results) and a setup checker, with step-by-step re-run instructions.&quot;]},
+  {id:&quot;mkb&quot;,type:&quot;method&quot;,label:&quot;Weakness knowledge base&quot;,title:&quot;Weakness knowledge base&quot;,detail:[&quot;One entry per weakness, each with the models it affects, a trigger, evidence, a miner weight and a detection rule.&quot;,&quot;Lifecycle: a weakness starts as a hypothesis, becomes supported once controlled experiments show it, and is proven once a holdout of real tasks confirms it. Rejected entries are ignored.&quot;],meta:[[&quot;Entries&quot;,&quot;3&quot;],[&quot;Supported&quot;,&quot;3&quot;],[&quot;Proven&quot;,&quot;0&quot;]]},
+  {id:&quot;mmine&quot;,type:&quot;method&quot;,label:&quot;Candidate miner&quot;,title:&quot;Candidate miner&quot;,detail:[&quot;Scores candidate advisories with every weakness that is not rejected, adding that weakness&#x27;s weight when its detection rule matches the real fix. Rules can check repeated fix sites, file, directory, function and hunk counts, summary text, CWEs, languages and advisories per repo.&quot;]},
+  {id:&quot;dgap&quot;,type:&quot;design&quot;,label:&quot;Gap: primary weakness not in KB&quot;,title:&quot;Gap: the primary weakness is missing from the knowledge base&quot;,detail:[&quot;The best-evidenced weakness, a check plus a data producer across a save/load boundary (19/19 failures, pass@3 = 0 on a real repository), has no knowledge-base entry, so the miner does not score candidates for it. Patterns A, B and C are missing too.&quot;,&quot;Ingredient 1 already describes a detection rule: a fix that touches both a check and a schema, serializer, parser or loader. Under the knowledge base&#x27;s lifecycle it would enter as supported, and the second real repository in progress would make it proven.&quot;]},
 ];
 
 const E = [
-  ["ds","W0","exhibits"],["ds","WA","exhibits"],["ds","WB","exhibits"],["ds","WC","exhibits"],
-  ["ds","s1","shows"],["ds","s2","shows"],["ds","s3","shows"],["ds","s4","shows"],["ds","s5","shows"],
-  ["W0","c1","triggers when"],["W0","c2","triggers when"],["W0","c3","triggers when"],["W0","c4","triggers when"],
-  ["WA","a1","triggers when"],["WA","a2","triggers when"],["WA","a3","triggers when"],
-  ["W0","r1","dismissed via"],["W0","r2","dismissed via"],["W0","r3","dismissed via"],["W0","r4","dismissed via"],["W0","r5","dismissed via"],
-  ["WC","W0","keeps it unchallenged"],["c4","WC","feeds"],
-  ["f19","W0","evidence for"],["fknow","W0","rules out cause"],["fskill","W0","rules out cause"],["fnotice","W0","evidence for"],
-  ["fstop","W0","evidence for"],["fstop","WC","evidence for"],["fgeneric","W0","evidence for"],["ftest","WC","breaks"],
-  ["fcomments","W0","rules out cause"],["flocation","W0","rules out cause"],
+  [&quot;ds&quot;,&quot;W0&quot;,&quot;exhibits&quot;],[&quot;ds&quot;,&quot;WA&quot;,&quot;exhibits&quot;],[&quot;ds&quot;,&quot;WB&quot;,&quot;exhibits&quot;],[&quot;ds&quot;,&quot;WC&quot;,&quot;exhibits&quot;],
+  [&quot;ds&quot;,&quot;s1&quot;,&quot;shows&quot;],[&quot;ds&quot;,&quot;s2&quot;,&quot;shows&quot;],[&quot;ds&quot;,&quot;s3&quot;,&quot;shows&quot;],[&quot;ds&quot;,&quot;s4&quot;,&quot;shows&quot;],[&quot;ds&quot;,&quot;s5&quot;,&quot;shows&quot;],
+  [&quot;W0&quot;,&quot;c1&quot;,&quot;triggers when&quot;],[&quot;W0&quot;,&quot;c2&quot;,&quot;triggers when&quot;],[&quot;W0&quot;,&quot;c3&quot;,&quot;triggers when&quot;],[&quot;W0&quot;,&quot;c4&quot;,&quot;triggers when&quot;],
+  [&quot;WA&quot;,&quot;a1&quot;,&quot;triggers when&quot;],[&quot;WA&quot;,&quot;a2&quot;,&quot;triggers when&quot;],[&quot;WA&quot;,&quot;a3&quot;,&quot;triggers when&quot;],
+  [&quot;W0&quot;,&quot;r1&quot;,&quot;dismissed via&quot;],[&quot;W0&quot;,&quot;r2&quot;,&quot;dismissed via&quot;],[&quot;W0&quot;,&quot;r3&quot;,&quot;dismissed via&quot;],[&quot;W0&quot;,&quot;r4&quot;,&quot;dismissed via&quot;],[&quot;W0&quot;,&quot;r5&quot;,&quot;dismissed via&quot;],
+  [&quot;WC&quot;,&quot;W0&quot;,&quot;keeps it unchallenged&quot;],[&quot;c4&quot;,&quot;WC&quot;,&quot;feeds&quot;],
+  [&quot;f19&quot;,&quot;W0&quot;,&quot;evidence for&quot;],[&quot;fknow&quot;,&quot;W0&quot;,&quot;rules out cause&quot;],[&quot;fskill&quot;,&quot;W0&quot;,&quot;rules out cause&quot;],[&quot;fnotice&quot;,&quot;W0&quot;,&quot;evidence for&quot;],
+  [&quot;fstop&quot;,&quot;W0&quot;,&quot;evidence for&quot;],[&quot;fstop&quot;,&quot;WC&quot;,&quot;evidence for&quot;],[&quot;fgeneric&quot;,&quot;W0&quot;,&quot;evidence for&quot;],[&quot;ftest&quot;,&quot;WC&quot;,&quot;breaks&quot;],
+  [&quot;fcomments&quot;,&quot;W0&quot;,&quot;rules out cause&quot;],[&quot;flocation&quot;,&quot;W0&quot;,&quot;rules out cause&quot;],
   // code
-  ["ksdk","kschema","contains"],["ksdk","kcheck","contains"],["ksdk","kf2","contains"],["ksdk","kreqid","contains"],
-  ["kfetch","kcheck","runs"],["kschema","kissuer","strips"],["kcheck","kissuer","relies on"],
-  ["kschema","c2","instance of"],["kreqid","a1","instance of"],["kf2","a2","fix restricts"],
+  [&quot;ksdk&quot;,&quot;kschema&quot;,&quot;contains&quot;],[&quot;ksdk&quot;,&quot;kcheck&quot;,&quot;contains&quot;],[&quot;ksdk&quot;,&quot;kf2&quot;,&quot;contains&quot;],[&quot;ksdk&quot;,&quot;kreqid&quot;,&quot;contains&quot;],
+  [&quot;kfetch&quot;,&quot;kcheck&quot;,&quot;runs&quot;],[&quot;kschema&quot;,&quot;kissuer&quot;,&quot;strips&quot;],[&quot;kcheck&quot;,&quot;kissuer&quot;,&quot;relies on&quot;],
+  [&quot;kschema&quot;,&quot;c2&quot;,&quot;instance of&quot;],[&quot;kreqid&quot;,&quot;a1&quot;,&quot;instance of&quot;],[&quot;kf2&quot;,&quot;a2&quot;,&quot;fix restricts&quot;],
   // real tasks
-  ["t9","W0","fails via"],["t9","WC","fails via"],["t9","ksdk","in repo"],["t9","kcheck","fixed"],["t9","kschema","left unfixed"],["t9","f19","counted in"],
-  ["t10","W0","contrast case"],["t10","s4","shows"],["t27","t10","control for"],
-  ["t5","s2","shows"],["t7","s2","shows"],["t8","s2","shows"],["t6","t25","same codebase"],
+  [&quot;t9&quot;,&quot;W0&quot;,&quot;fails via&quot;],[&quot;t9&quot;,&quot;WC&quot;,&quot;fails via&quot;],[&quot;t9&quot;,&quot;ksdk&quot;,&quot;in repo&quot;],[&quot;t9&quot;,&quot;kcheck&quot;,&quot;fixed&quot;],[&quot;t9&quot;,&quot;kschema&quot;,&quot;left unfixed&quot;],[&quot;t9&quot;,&quot;f19&quot;,&quot;counted in&quot;],
+  [&quot;t10&quot;,&quot;W0&quot;,&quot;contrast case&quot;],[&quot;t10&quot;,&quot;s4&quot;,&quot;shows&quot;],[&quot;t27&quot;,&quot;t10&quot;,&quot;control for&quot;],
+  [&quot;t5&quot;,&quot;s2&quot;,&quot;shows&quot;],[&quot;t7&quot;,&quot;s2&quot;,&quot;shows&quot;],[&quot;t8&quot;,&quot;s2&quot;,&quot;shows&quot;],[&quot;t6&quot;,&quot;t25&quot;,&quot;same codebase&quot;],
   // variant tree
-  ["ksdk","t11","variants built on"],["t11","t12","+ producer bug"],
-  ["t12","t13","+ one-sentence hint"],["t12","t14","− comments"],["t12","t15","check pre-fixed"],["t12","t16","schema inside token request"],
-  ["t12","t17","+ verify reminder"],["t12","t18","+ audit reminder"],["t12","t19","+ failing test"],["t12","t21","+ F2"],
-  ["t12","W0","fails via"],["t12","f19","counted in"],
-  ["t13","fskill","shows"],["t13","s3","shows"],["t14","fcomments","shows"],["t16","flocation","shows"],["t16","kfetch","modifies"],
-  ["t17","fgeneric","shows"],["t18","fgeneric","shows"],["t19","ftest","shows"],["t15","W0","fails via"],
-  ["t11","t20","+ F2"],["t20","WA","fails via"],["t20","kreqid","fixed decoy"],["t20","kf2","missed"],["t20","WC","fails via"],
-  ["t21","WA","fails via"],["t21","W0","fails via"],["t22","t23","bug at all 3 sites"],["t23","WA","fails via"],["t22","WA","control"],
-  ["t24a","t24b","+ 5 other flaws"],["t24b","WB","fails via"],["t26a","t26b","+ deadlock"],["t26b","WB","fails via"],
+  [&quot;ksdk&quot;,&quot;t11&quot;,&quot;variants built on&quot;],[&quot;t11&quot;,&quot;t12&quot;,&quot;+ producer bug&quot;],
+  [&quot;t12&quot;,&quot;t13&quot;,&quot;+ one-sentence hint&quot;],[&quot;t12&quot;,&quot;t14&quot;,&quot;− comments&quot;],[&quot;t12&quot;,&quot;t15&quot;,&quot;check pre-fixed&quot;],[&quot;t12&quot;,&quot;t16&quot;,&quot;schema inside token request&quot;],
+  [&quot;t12&quot;,&quot;t17&quot;,&quot;+ verify reminder&quot;],[&quot;t12&quot;,&quot;t18&quot;,&quot;+ audit reminder&quot;],[&quot;t12&quot;,&quot;t19&quot;,&quot;+ failing test&quot;],[&quot;t12&quot;,&quot;t21&quot;,&quot;+ F2&quot;],
+  [&quot;t12&quot;,&quot;W0&quot;,&quot;fails via&quot;],[&quot;t12&quot;,&quot;f19&quot;,&quot;counted in&quot;],
+  [&quot;t13&quot;,&quot;fskill&quot;,&quot;shows&quot;],[&quot;t13&quot;,&quot;s3&quot;,&quot;shows&quot;],[&quot;t14&quot;,&quot;fcomments&quot;,&quot;shows&quot;],[&quot;t16&quot;,&quot;flocation&quot;,&quot;shows&quot;],[&quot;t16&quot;,&quot;kfetch&quot;,&quot;modifies&quot;],
+  [&quot;t17&quot;,&quot;fgeneric&quot;,&quot;shows&quot;],[&quot;t18&quot;,&quot;fgeneric&quot;,&quot;shows&quot;],[&quot;t19&quot;,&quot;ftest&quot;,&quot;shows&quot;],[&quot;t15&quot;,&quot;W0&quot;,&quot;fails via&quot;],
+  [&quot;t11&quot;,&quot;t20&quot;,&quot;+ F2&quot;],[&quot;t20&quot;,&quot;WA&quot;,&quot;fails via&quot;],[&quot;t20&quot;,&quot;kreqid&quot;,&quot;fixed decoy&quot;],[&quot;t20&quot;,&quot;kf2&quot;,&quot;missed&quot;],[&quot;t20&quot;,&quot;WC&quot;,&quot;fails via&quot;],
+  [&quot;t21&quot;,&quot;WA&quot;,&quot;fails via&quot;],[&quot;t21&quot;,&quot;W0&quot;,&quot;fails via&quot;],[&quot;t22&quot;,&quot;t23&quot;,&quot;bug at all 3 sites&quot;],[&quot;t23&quot;,&quot;WA&quot;,&quot;fails via&quot;],[&quot;t22&quot;,&quot;WA&quot;,&quot;control&quot;],
+  [&quot;t24a&quot;,&quot;t24b&quot;,&quot;+ 5 other flaws&quot;],[&quot;t24b&quot;,&quot;WB&quot;,&quot;fails via&quot;],[&quot;t26a&quot;,&quot;t26b&quot;,&quot;+ deadlock&quot;],[&quot;t26b&quot;,&quot;WB&quot;,&quot;fails via&quot;],
   // design
-  ["W0","d1","informs"],["W0","d2","informs"],["WC","d3","informs"],["WA","d4","informs"],
-  ["dnext","W0","aims to reproduce"],["dsafe","mtests","governs"],
+  [&quot;W0&quot;,&quot;d1&quot;,&quot;informs&quot;],[&quot;W0&quot;,&quot;d2&quot;,&quot;informs&quot;],[&quot;WC&quot;,&quot;d3&quot;,&quot;informs&quot;],[&quot;WA&quot;,&quot;d4&quot;,&quot;informs&quot;],
+  [&quot;dnext&quot;,&quot;W0&quot;,&quot;aims to reproduce&quot;],[&quot;dsafe&quot;,&quot;mtests&quot;,&quot;governs&quot;],
   // method
-  ["mharness","ds","runs"],["mreport","mharness","given via"],["mreport","c3","enables"],["mtests","mscore","feeds"],["mscore","t9","pass@3 = 0 met"],["mrepro","t9","packages"],
+  [&quot;mharness&quot;,&quot;ds&quot;,&quot;runs&quot;],[&quot;mreport&quot;,&quot;mharness&quot;,&quot;given via&quot;],[&quot;mreport&quot;,&quot;c3&quot;,&quot;enables&quot;],[&quot;mtests&quot;,&quot;mscore&quot;,&quot;feeds&quot;],[&quot;mscore&quot;,&quot;t9&quot;,&quot;pass@3 = 0 met&quot;],[&quot;mrepro&quot;,&quot;t9&quot;,&quot;packages&quot;],
   // knowledge base
-  ["ds","WS","exhibits"],["mB","WK","exhibits"],["ds","WX","shows"],["mB","WX","shows"],
-  ["WS","cs","triggers when"],["WK","ck","triggers when"],["WX","cx","holds when"],
-  ["fdrv","WS","evidence for"],["finj","WS","evidence for"],["fstk","WK","evidence for"],["fsgl","WX","evidence for"],["t1","fsgl","counted in"],
-  ["WS","s2","contradicts"],["t23","WS","also fits"],["WK","WB","similar shape to"],
-  ["WS","mkb","recorded in"],["WK","mkb","recorded in"],["WX","mkb","recorded in"],["mkb","mmine","feeds"],
-  ["dgap","mkb","missing from"],["dgap","W0","should add"],["dnext","dgap","would prove"],
+  [&quot;ds&quot;,&quot;WS&quot;,&quot;exhibits&quot;],[&quot;mB&quot;,&quot;WK&quot;,&quot;exhibits&quot;],[&quot;ds&quot;,&quot;WX&quot;,&quot;shows&quot;],[&quot;mB&quot;,&quot;WX&quot;,&quot;shows&quot;],
+  [&quot;WS&quot;,&quot;cs&quot;,&quot;triggers when&quot;],[&quot;WK&quot;,&quot;ck&quot;,&quot;triggers when&quot;],[&quot;WX&quot;,&quot;cx&quot;,&quot;holds when&quot;],
+  [&quot;fdrv&quot;,&quot;WS&quot;,&quot;evidence for&quot;],[&quot;finj&quot;,&quot;WS&quot;,&quot;evidence for&quot;],[&quot;fstk&quot;,&quot;WK&quot;,&quot;evidence for&quot;],[&quot;fsgl&quot;,&quot;WX&quot;,&quot;evidence for&quot;],[&quot;t1&quot;,&quot;fsgl&quot;,&quot;counted in&quot;],
+  [&quot;WS&quot;,&quot;s2&quot;,&quot;contradicts&quot;],[&quot;t23&quot;,&quot;WS&quot;,&quot;also fits&quot;],[&quot;WK&quot;,&quot;WB&quot;,&quot;similar shape to&quot;],
+  [&quot;WS&quot;,&quot;mkb&quot;,&quot;recorded in&quot;],[&quot;WK&quot;,&quot;mkb&quot;,&quot;recorded in&quot;],[&quot;WX&quot;,&quot;mkb&quot;,&quot;recorded in&quot;],[&quot;mkb&quot;,&quot;mmine&quot;,&quot;feeds&quot;],
+  [&quot;dgap&quot;,&quot;mkb&quot;,&quot;missing from&quot;],[&quot;dgap&quot;,&quot;W0&quot;,&quot;should add&quot;],[&quot;dnext&quot;,&quot;dgap&quot;,&quot;would prove&quot;],
 ];
 
 
-const byId = Object.fromEntries(N.map(n=>[n.id,n]));
-const links = E.map(([s,t,l])=>({source:s,target:t,label:l}));
-N.forEach(n=>{
-  if(!n.r) n.r = n.type==="task" ? (n.status==="failed"?8:7) : n.type==="weak"?15 : n.type==="model"?22 : 8;
-  n.big = n.r>=12;
+const byId = Object.fromEntries(N.map(n=&gt;[n.id,n]));
+const links = E.map(([s,t,l])=&gt;({source:s,target:t,label:l}));
+N.forEach(n=&gt;{
+  if(!n.r) n.r = n.type===&quot;task&quot; ? (n.status===&quot;failed&quot;?8:7) : n.type===&quot;weak&quot;?15 : n.type===&quot;model&quot;?22 : 8;
+  n.big = n.r&gt;=12;
 });
-const minorTypes = new Set(["reason"]);
+const minorTypes = new Set([&quot;reason&quot;]);
 
 const ANCH = {model:[600,460],weak:[620,470],cond:[960,200],reason:[1060,520],find:[820,760],task:[300,500],code:[330,140],strength:[480,860],design:[1060,860],method:[120,820]};
 const sim = d3.forceSimulation(N)
-  .force("link", d3.forceLink(links).id(d=>d.id).distance(l=>{
-    const a=l.source.type,b=l.target.type; return (a==="task"&&b==="task")?55:(a===b?70:95);
+  .force(&quot;link&quot;, d3.forceLink(links).id(d=&gt;d.id).distance(l=&gt;{
+    const a=l.source.type,b=l.target.type; return (a===&quot;task&quot;&amp;&amp;b===&quot;task&quot;)?55:(a===b?70:95);
   }).strength(.5))
-  .force("charge", d3.forceManyBody().strength(d=>d.big?-700:-260))
-  .force("collide", d3.forceCollide(d=>d.r+16))
-  .force("x", d3.forceX(d=>ANCH[d.type][0]).strength(.07))
-  .force("y", d3.forceY(d=>ANCH[d.type][1]).strength(.07))
+  .force(&quot;charge&quot;, d3.forceManyBody().strength(d=&gt;d.big?-700:-260))
+  .force(&quot;collide&quot;, d3.forceCollide(d=&gt;d.r+16))
+  .force(&quot;x&quot;, d3.forceX(d=&gt;ANCH[d.type][0]).strength(.07))
+  .force(&quot;y&quot;, d3.forceY(d=&gt;ANCH[d.type][1]).strength(.07))
   .stop();
-for(let i=0;i<500;i++) sim.tick();
+for(let i=0;i&lt;500;i++) sim.tick();
 
-const canvas = document.getElementById("canvas");
-const svg = d3.select(canvas).insert("svg",":first-child").attr("role","img").attr("aria-label","Knowledge graph of coding-agent weaknesses");
-const defs = svg.append("defs");
-["arrow","arrow-on"].forEach(id=>defs.append("marker").attr("id",id).attr("viewBox","0 0 10 10").attr("refX",9).attr("refY",5)
-  .attr("markerWidth",6).attr("markerHeight",6).attr("orient","auto-start-reverse").append("path").attr("d","M0,1 L9,5 L0,9 z"));
-const root = svg.append("g");
-const zoom = d3.zoom().scaleExtent([.25,4]).on("zoom", e=>root.attr("transform", e.transform));
-svg.call(zoom).on("dblclick.zoom",null);
-svg.on("click", e=>{ if(e.target===svg.node()) select(null); });
+const canvas = document.getElementById(&quot;canvas&quot;);
+const svg = d3.select(canvas).insert(&quot;svg&quot;,&quot;:first-child&quot;).attr(&quot;role&quot;,&quot;img&quot;).attr(&quot;aria-label&quot;,&quot;Knowledge graph of coding-agent weaknesses&quot;);
+const defs = svg.append(&quot;defs&quot;);
+[&quot;arrow&quot;,&quot;arrow-on&quot;].forEach(id=&gt;defs.append(&quot;marker&quot;).attr(&quot;id&quot;,id).attr(&quot;viewBox&quot;,&quot;0 0 10 10&quot;).attr(&quot;refX&quot;,9).attr(&quot;refY&quot;,5)
+  .attr(&quot;markerWidth&quot;,6).attr(&quot;markerHeight&quot;,6).attr(&quot;orient&quot;,&quot;auto-start-reverse&quot;).append(&quot;path&quot;).attr(&quot;d&quot;,&quot;M0,1 L9,5 L0,9 z&quot;));
+const root = svg.append(&quot;g&quot;);
+const zoom = d3.zoom().scaleExtent([.25,4]).on(&quot;zoom&quot;, e=&gt;root.attr(&quot;transform&quot;, e.transform));
+svg.call(zoom).on(&quot;dblclick.zoom&quot;,null);
+svg.on(&quot;click&quot;, e=&gt;{ if(e.target===svg.node()) select(null); });
 
-const linkSel = root.append("g").selectAll("line").data(links).join("line").attr("class","link").attr("marker-end","url(#arrow)");
-const elabSel = root.append("g").selectAll("text").data(links).join("text").attr("class","elabel").attr("text-anchor","middle").text(d=>d.label);
-const nodeSel = root.append("g").selectAll("g").data(N).join("g")
-  .attr("class",d=>`node t-${d.type}${d.type==="task"?" task "+d.status:""}${d.big?" big":""}${minorTypes.has(d.type)?" minor":""}`)
-  .attr("tabindex",0).attr("role","button").attr("aria-label",d=>`${TYPES[d.type].name}: ${d.title}`)
-  .on("click",(e,d)=>{e.stopPropagation(); select(d.id);})
-  .on("keydown",(e,d)=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault(); select(d.id);} })
+const linkSel = root.append(&quot;g&quot;).selectAll(&quot;line&quot;).data(links).join(&quot;line&quot;).attr(&quot;class&quot;,&quot;link&quot;).attr(&quot;marker-end&quot;,&quot;url(#arrow)&quot;);
+const elabSel = root.append(&quot;g&quot;).selectAll(&quot;text&quot;).data(links).join(&quot;text&quot;).attr(&quot;class&quot;,&quot;elabel&quot;).attr(&quot;text-anchor&quot;,&quot;middle&quot;).text(d=&gt;d.label);
+const nodeSel = root.append(&quot;g&quot;).selectAll(&quot;g&quot;).data(N).join(&quot;g&quot;)
+  .attr(&quot;class&quot;,d=&gt;`node t-${d.type}${d.type===&quot;task&quot;?&quot; task &quot;+d.status:&quot;&quot;}${d.big?&quot; big&quot;:&quot;&quot;}${minorTypes.has(d.type)?&quot; minor&quot;:&quot;&quot;}`)
+  .attr(&quot;tabindex&quot;,0).attr(&quot;role&quot;,&quot;button&quot;).attr(&quot;aria-label&quot;,d=&gt;`${TYPES[d.type].name}: ${d.title}`)
+  .on(&quot;click&quot;,(e,d)=&gt;{e.stopPropagation(); select(d.id);})
+  .on(&quot;keydown&quot;,(e,d)=&gt;{ if(e.key===&quot;Enter&quot;||e.key===&quot; &quot;){e.preventDefault(); select(d.id);} })
   .call(d3.drag()
-    .on("start",(e,d)=>{ if(!e.active) sim.alphaTarget(.15).restart(); d.fx=d.x; d.fy=d.y; })
-    .on("drag",(e,d)=>{ d.fx=e.x; d.fy=e.y; })
-    .on("end",(e,d)=>{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
-nodeSel.append("circle").attr("r",d=>d.r);
-nodeSel.append("text").attr("x",d=>d.r+5).attr("dy",".35em").text(d=>d.label);
-nodeSel.append("title").text(d=>d.title);
+    .on(&quot;start&quot;,(e,d)=&gt;{ if(!e.active) sim.alphaTarget(.15).restart(); d.fx=d.x; d.fy=d.y; })
+    .on(&quot;drag&quot;,(e,d)=&gt;{ d.fx=e.x; d.fy=e.y; })
+    .on(&quot;end&quot;,(e,d)=&gt;{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+nodeSel.append(&quot;circle&quot;).attr(&quot;r&quot;,d=&gt;d.r);
+nodeSel.append(&quot;text&quot;).attr(&quot;x&quot;,d=&gt;d.r+5).attr(&quot;dy&quot;,&quot;.35em&quot;).text(d=&gt;d.label);
+nodeSel.append(&quot;title&quot;).text(d=&gt;d.title);
 
 function draw(){
   linkSel.each(function(l){
     const dx=l.target.x-l.source.x, dy=l.target.y-l.source.y, len=Math.hypot(dx,dy)||1;
     const ux=dx/len, uy=dy/len;
-    this.setAttribute("x1", l.source.x+ux*l.source.r); this.setAttribute("y1", l.source.y+uy*l.source.r);
-    this.setAttribute("x2", l.target.x-ux*(l.target.r+3)); this.setAttribute("y2", l.target.y-uy*(l.target.r+3));
+    this.setAttribute(&quot;x1&quot;, l.source.x+ux*l.source.r); this.setAttribute(&quot;y1&quot;, l.source.y+uy*l.source.r);
+    this.setAttribute(&quot;x2&quot;, l.target.x-ux*(l.target.r+3)); this.setAttribute(&quot;y2&quot;, l.target.y-uy*(l.target.r+3));
   });
-  elabSel.attr("x",l=>(l.source.x+l.target.x)/2).attr("y",l=>(l.source.y+l.target.y)/2-3);
-  nodeSel.attr("transform",d=>`translate(${d.x},${d.y})`);
+  elabSel.attr(&quot;x&quot;,l=&gt;(l.source.x+l.target.x)/2).attr(&quot;y&quot;,l=&gt;(l.source.y+l.target.y)/2-3);
+  nodeSel.attr(&quot;transform&quot;,d=&gt;`translate(${d.x},${d.y})`);
 }
-sim.on("tick", draw);
+sim.on(&quot;tick&quot;, draw);
 draw();
 
 const hiddenTypes = new Set();
@@ -407,7 +800,7 @@ function visible(n){ return !hiddenTypes.has(n.type); }
 function fit(dur){
   const vis=N.filter(visible); if(!vis.length) return;
   const W=canvas.clientWidth, H=canvas.clientHeight;
-  const x0=d3.min(vis,d=>d.x-d.r)-20, x1=d3.max(vis,d=>d.x+d.r)+150, y0=d3.min(vis,d=>d.y-d.r)-20, y1=d3.max(vis,d=>d.y+d.r)+20;
+  const x0=d3.min(vis,d=&gt;d.x-d.r)-20, x1=d3.max(vis,d=&gt;d.x+d.r)+150, y0=d3.min(vis,d=&gt;d.y-d.r)-20, y1=d3.max(vis,d=&gt;d.y+d.r)+20;
   const s=Math.min(W/(x1-x0), H/(y1-y0), 1.6);
   const t=d3.zoomIdentity.translate(W/2-s*(x0+x1)/2, H/2-s*(y0+y1)/2).scale(s);
   (dur? svg.transition().duration(dur) : svg).call(zoom.transform,t);
@@ -416,116 +809,540 @@ function fit(dur){
 let selected=null;
 function neighbors(id){
   const out=[], inc=[];
-  links.forEach(l=>{ if(l.source.id===id) out.push(l); else if(l.target.id===id) inc.push(l); });
+  links.forEach(l=&gt;{ if(l.source.id===id) out.push(l); else if(l.target.id===id) inc.push(l); });
   return {out,inc};
 }
 function select(id){
   selected=id;
   if(!id){
-    nodeSel.classed("dim",false).classed("sel",false);
-    linkSel.classed("on",false).classed("dim",false).attr("marker-end","url(#arrow)");
-    elabSel.classed("on",false);
+    nodeSel.classed(&quot;dim&quot;,false).classed(&quot;sel&quot;,false);
+    linkSel.classed(&quot;on&quot;,false).classed(&quot;dim&quot;,false).attr(&quot;marker-end&quot;,&quot;url(#arrow)&quot;);
+    elabSel.classed(&quot;on&quot;,false);
     renderOverview(); return;
   }
-  const {out,inc}=neighbors(id); const nb=new Set([id,...out.map(l=>l.target.id),...inc.map(l=>l.source.id)]);
-  nodeSel.classed("dim",d=>!nb.has(d.id)).classed("sel",d=>d.id===id);
-  const on=l=>l.source.id===id||l.target.id===id;
-  linkSel.classed("on",on).classed("dim",l=>!on(l)).attr("marker-end",l=>on(l)?"url(#arrow-on)":"url(#arrow)");
-  elabSel.classed("on",on);
-  nodeSel.filter(d=>d.id===id).raise();
+  const {out,inc}=neighbors(id); const nb=new Set([id,...out.map(l=&gt;l.target.id),...inc.map(l=&gt;l.source.id)]);
+  nodeSel.classed(&quot;dim&quot;,d=&gt;!nb.has(d.id)).classed(&quot;sel&quot;,d=&gt;d.id===id);
+  const on=l=&gt;l.source.id===id||l.target.id===id;
+  linkSel.classed(&quot;on&quot;,on).classed(&quot;dim&quot;,l=&gt;!on(l)).attr(&quot;marker-end&quot;,l=&gt;on(l)?&quot;url(#arrow-on)&quot;:&quot;url(#arrow)&quot;);
+  elabSel.classed(&quot;on&quot;,on);
+  nodeSel.filter(d=&gt;d.id===id).raise();
   renderNode(byId[id]);
 }
 
-const panel=document.getElementById("panel");
+const panel=document.getElementById(&quot;panel&quot;);
 function el(tag,cls,text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
 function typeRow(type){
-  const r=el("div","ptype t-"+type); r.append(el("span","dot"), el("span","eyebrow",TYPES[type].name)); return r;
+  const r=el(&quot;div&quot;,&quot;ptype t-&quot;+type); r.append(el(&quot;span&quot;,&quot;dot&quot;), el(&quot;span&quot;,&quot;eyebrow&quot;,TYPES[type].name)); return r;
 }
 function nodeButton(n){
-  const li=el("li"); const dot=el("span","dot"); li.classList.add("t-"+n.type);
-  const b=el("button",null,n.label); b.type="button"; b.addEventListener("click",()=>select(n.id));
+  const li=el(&quot;li&quot;); const dot=el(&quot;span&quot;,&quot;dot&quot;); li.classList.add(&quot;t-&quot;+n.type);
+  const b=el(&quot;button&quot;,null,n.label); b.type=&quot;button&quot;; b.addEventListener(&quot;click&quot;,()=&gt;select(n.id));
   li.append(dot,b); return li;
 }
 function renderNode(n){
   panel.replaceChildren();
-  panel.append(typeRow(n.type), el("h2",null,n.title));
-  if(n.type==="task"){
-    if(n.task) panel.append(el("div","eyebrow","Task · "+n.task));
-    panel.append(el("span","pill "+n.status,(n.status==="failed"?"Failed":"Solved")+(n.score?" · "+n.score:"")+(n.real?" · real vulnerability":" · controlled variant")));
+  panel.append(typeRow(n.type), el(&quot;h2&quot;,null,n.title));
+  if(n.type===&quot;task&quot;){
+    if(n.task) panel.append(el(&quot;div&quot;,&quot;eyebrow&quot;,&quot;Task · &quot;+n.task));
+    panel.append(el(&quot;span&quot;,&quot;pill &quot;+n.status,(n.status===&quot;failed&quot;?&quot;Failed&quot;:&quot;Solved&quot;)+(n.score?&quot; · &quot;+n.score:&quot;&quot;)+(n.real?&quot; · real vulnerability&quot;:&quot; · controlled variant&quot;)));
   }
-  (n.detail||[]).forEach(p=>panel.append(el("p",null,p)));
-  (n.quotes||[]).forEach(q=>panel.append(el("p","quote",q)));
-  if(n.meta){ const dl=el("dl","meta"); n.meta.forEach(([k,v])=>dl.append(el("dt",null,k),el("dd",null,v))); panel.append(dl); }
+  (n.detail||[]).forEach(p=&gt;panel.append(el(&quot;p&quot;,null,p)));
+  (n.quotes||[]).forEach(q=&gt;panel.append(el(&quot;p&quot;,&quot;quote&quot;,q)));
+  if(n.meta){ const dl=el(&quot;dl&quot;,&quot;meta&quot;); n.meta.forEach(([k,v])=&gt;dl.append(el(&quot;dt&quot;,null,k),el(&quot;dd&quot;,null,v))); panel.append(dl); }
   const {out,inc}=neighbors(n.id);
-  const groups=[["Points to",out,l=>l.target],["Pointed to by",inc,l=>l.source]];
-  groups.forEach(([h,arr,pick])=>{
+  const groups=[[&quot;Points to&quot;,out,l=&gt;l.target],[&quot;Pointed to by&quot;,inc,l=&gt;l.source]];
+  groups.forEach(([h,arr,pick])=&gt;{
     if(!arr.length) return;
-    const wrap=el("div","conn"); wrap.append(el("h3",null,`${h} (${arr.length})`));
-    const ul=el("ul");
-    arr.forEach(l=>{ const li=nodeButton(pick(l)); li.insertBefore(el("span","rel",l.label),li.firstChild); ul.append(li); });
+    const wrap=el(&quot;div&quot;,&quot;conn&quot;); wrap.append(el(&quot;h3&quot;,null,`${h} (${arr.length})`));
+    const ul=el(&quot;ul&quot;);
+    arr.forEach(l=&gt;{ const li=nodeButton(pick(l)); li.insertBefore(el(&quot;span&quot;,&quot;rel&quot;,l.label),li.firstChild); ul.append(li); });
     wrap.append(ul); panel.append(wrap);
   });
 }
 function renderOverview(){
   panel.replaceChildren();
-  panel.append(el("div","eyebrow","Overview"), el("h2",null,"One primary weakness, three secondary patterns"));
-  panel.append(el("p",null,"The model fixes the security check every time. When the fix also needs a change to the code that saves and reloads the data the check relies on, it spots the risk, dismisses it with an assumption it never tests, and stops once the existing tests pass."));
-  const wrap=el("div","conn"); wrap.append(el("h3",null,"Start here")); const ul=el("ul");
-  ["W0","WA","WB","WC","t9","ftest"].forEach(id=>ul.append(nodeButton(byId[id]))); wrap.append(ul); panel.append(wrap);
+  panel.append(el(&quot;div&quot;,&quot;eyebrow&quot;,&quot;Overview&quot;), el(&quot;h2&quot;,null,&quot;One primary weakness, three secondary patterns&quot;));
+  panel.append(el(&quot;p&quot;,null,&quot;The model fixes the security check every time. When the fix also needs a change to the code that saves and reloads the data the check relies on, it spots the risk, dismisses it with an assumption it never tests, and stops once the existing tests pass.&quot;));
+  const wrap=el(&quot;div&quot;,&quot;conn&quot;); wrap.append(el(&quot;h3&quot;,null,&quot;Start here&quot;)); const ul=el(&quot;ul&quot;);
+  [&quot;W0&quot;,&quot;WA&quot;,&quot;WB&quot;,&quot;WC&quot;,&quot;t9&quot;,&quot;ftest&quot;].forEach(id=&gt;ul.append(nodeButton(byId[id]))); wrap.append(ul); panel.append(wrap);
 }
 
 // toolbar
-const tb=document.getElementById("toolbar");
-Object.entries(TYPES).forEach(([k,v])=>{
-  const b=el("button","chip t-"+k); b.type="button"; b.setAttribute("aria-pressed","true");
-  b.append(el("span","dot"), document.createTextNode(`${v.name} ${N.filter(n=>n.type===k).length}`));
-  b.addEventListener("click",()=>{
+const tb=document.getElementById(&quot;toolbar&quot;);
+Object.entries(TYPES).forEach(([k,v])=&gt;{
+  const b=el(&quot;button&quot;,&quot;chip t-&quot;+k); b.type=&quot;button&quot;; b.setAttribute(&quot;aria-pressed&quot;,&quot;true&quot;);
+  b.append(el(&quot;span&quot;,&quot;dot&quot;), document.createTextNode(`${v.name} ${N.filter(n=&gt;n.type===k).length}`));
+  b.addEventListener(&quot;click&quot;,()=&gt;{
     if(hiddenTypes.has(k)) hiddenTypes.delete(k); else hiddenTypes.add(k);
-    b.setAttribute("aria-pressed", String(!hiddenTypes.has(k)));
+    b.setAttribute(&quot;aria-pressed&quot;, String(!hiddenTypes.has(k)));
     applyFilter();
   });
   tb.append(b);
 });
-tb.append(el("span","spacer"));
-const search=el("input","search"); search.type="search"; search.id="node-search"; search.placeholder="Find a node…"; search.setAttribute("aria-label","Find a node");
-search.addEventListener("input",()=>{
+tb.append(el(&quot;span&quot;,&quot;spacer&quot;));
+const search=el(&quot;input&quot;,&quot;search&quot;); search.type=&quot;search&quot;; search.id=&quot;node-search&quot;; search.placeholder=&quot;Find a node…&quot;; search.setAttribute(&quot;aria-label&quot;,&quot;Find a node&quot;);
+search.addEventListener(&quot;input&quot;,()=&gt;{
   const q=search.value.trim().toLowerCase();
-  nodeSel.classed("match",d=>q.length>1 && (d.label+" "+d.title+" "+(d.task||"")).toLowerCase().includes(q));
+  nodeSel.classed(&quot;match&quot;,d=&gt;q.length&gt;1 &amp;&amp; (d.label+&quot; &quot;+d.title+&quot; &quot;+(d.task||&quot;&quot;)).toLowerCase().includes(q));
 });
-search.addEventListener("keydown",e=>{
-  if(e.key!=="Enter") return;
-  const q=search.value.trim().toLowerCase(); const hit=N.find(d=>visible(d)&&(d.label+" "+d.title+" "+(d.task||"")).toLowerCase().includes(q));
+search.addEventListener(&quot;keydown&quot;,e=&gt;{
+  if(e.key!==&quot;Enter&quot;) return;
+  const q=search.value.trim().toLowerCase(); const hit=N.find(d=&gt;visible(d)&amp;&amp;(d.label+&quot; &quot;+d.title+&quot; &quot;+(d.task||&quot;&quot;)).toLowerCase().includes(q));
   if(hit) select(hit.id);
 });
-const reset=el("button","btn","Reset view"); reset.type="button";
-reset.addEventListener("click",()=>{ search.value=""; nodeSel.classed("match",false); select(null); fit(400); });
+const reset=el(&quot;button&quot;,&quot;btn&quot;,&quot;Reset view&quot;); reset.type=&quot;button&quot;;
+reset.addEventListener(&quot;click&quot;,()=&gt;{ search.value=&quot;&quot;; nodeSel.classed(&quot;match&quot;,false); select(null); fit(400); });
 tb.append(search, reset);
 
 function applyFilter(){
-  nodeSel.attr("display",d=>visible(d)?null:"none");
-  const lv=l=>visible(l.source)&&visible(l.target);
-  linkSel.attr("display",l=>lv(l)?null:"none"); elabSel.attr("display",l=>lv(l)?null:"none");
-  if(selected && !visible(byId[selected])) select(null);
+  nodeSel.attr(&quot;display&quot;,d=&gt;visible(d)?null:&quot;none&quot;);
+  const lv=l=&gt;visible(l.source)&amp;&amp;visible(l.target);
+  linkSel.attr(&quot;display&quot;,l=&gt;lv(l)?null:&quot;none&quot;); elabSel.attr(&quot;display&quot;,l=&gt;lv(l)?null:&quot;none&quot;);
+  if(selected &amp;&amp; !visible(byId[selected])) select(null);
 }
 
 // index
-const idx=document.getElementById("index");
-Object.entries(TYPES).forEach(([k,v])=>{
-  const items=N.filter(n=>n.type===k); if(!items.length) return;
-  const box=el("div","idx"); const h=el("h3","t-"+k); h.append(el("span","dot"), document.createTextNode(v.name)); box.append(h);
-  const ul=el("ul");
-  items.forEach(n=>{
+const idx=document.getElementById(&quot;index&quot;);
+Object.entries(TYPES).forEach(([k,v])=&gt;{
+  const items=N.filter(n=&gt;n.type===k); if(!items.length) return;
+  const box=el(&quot;div&quot;,&quot;idx&quot;); const h=el(&quot;h3&quot;,&quot;t-&quot;+k); h.append(el(&quot;span&quot;,&quot;dot&quot;), document.createTextNode(v.name)); box.append(h);
+  const ul=el(&quot;ul&quot;);
+  items.forEach(n=&gt;{
     const li=nodeButton(n);
-    if(n.type==="task") li.append(el("span","sc "+n.status,(n.status==="failed"?"failed":"solved")+(n.score?" "+n.score:"")));
-    li.querySelector("button").addEventListener("click",()=>canvas.scrollIntoView({behavior:"smooth",block:"nearest"}));
+    if(n.type===&quot;task&quot;) li.append(el(&quot;span&quot;,&quot;sc &quot;+n.status,(n.status===&quot;failed&quot;?&quot;failed&quot;:&quot;solved&quot;)+(n.score?&quot; &quot;+n.score:&quot;&quot;)));
+    li.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;,()=&gt;canvas.scrollIntoView({behavior:&quot;smooth&quot;,block:&quot;nearest&quot;}));
     ul.append(li);
   });
   box.append(ul); idx.append(box);
 });
 
-new ResizeObserver(()=>fit(0)).observe(canvas);
+new ResizeObserver(()=&gt;fit(0)).observe(canvas);
 fit(0);
-select("W0");
+select(&quot;W0&quot;);
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+    </div>
+    <div class="legend2">
+      <span style="--c:#f06a7e">weakness</span><span style="--c:#e3a54a">trigger condition</span><span style="--c:#ab88ef">evidence</span>
+      <span style="--c:#d88aca">reason the model gave</span><span style="--c:#68a6ea">task (ring: solved / failed)</span>
+      <span style="--c:#4cc292">strength</span><span style="--c:#9cb0c7">task-design implication</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 4 HOW ============================== -->
+<section class="band alt" id="how" data-anim>
+  <div class="wrap">
+    <div class="kicker">04 · How it works</div>
+    <h2>A loop that gets smarter every time it runs.</h2>
+    <p class="lead">Vanguard turns that research into a machine. It ranks real vulnerabilities, builds the most promising
+      ones into tasks, checks they are fair, runs the models, and feeds every result back into the graph.</p>
+    <div class="loopsvg"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" width="1200" height="660" role="img" aria-label="How Vanguard works: consult the knowledge graph, rank advisories, narrow down, build the task, approve, validate, run the models, learn, and repeat">
+<title>How Vanguard works</title>
+<defs><filter id='glow' x='-80%' y='-80%' width='260%' height='260%'><feGaussianBlur stdDeviation='6' result='b'/><feMerge><feMergeNode in='b'/><feMergeNode in='SourceGraphic'/></feMerge></filter><radialGradient id='halo'><stop offset='0' stop-color='#8d9cff' stop-opacity='.35'/><stop offset='1' stop-color='#8d9cff' stop-opacity='0'/></radialGradient></defs>
+<style>@keyframes travel{0.000%{offset-distance:0.000%} 8.438%{offset-distance:0.000%} 12.500%{offset-distance:14.952%} 20.938%{offset-distance:14.952%} 25.000%{offset-distance:25.000%} 33.438%{offset-distance:25.000%} 37.500%{offset-distance:35.048%} 45.938%{offset-distance:35.048%} 50.000%{offset-distance:50.000%} 58.438%{offset-distance:50.000%} 62.500%{offset-distance:64.952%} 70.938%{offset-distance:64.952%} 75.000%{offset-distance:75.000%} 83.438%{offset-distance:75.000%} 87.500%{offset-distance:85.048%} 95.938%{offset-distance:85.048%} 100%{offset-distance:100%}}.cand{offset-path:path('M 600 86 A 452 232 0 1 1 600 550 A 452 232 0 1 1 600 86');offset-rotate:0deg;animation:travel 16s linear infinite}@keyframes st0{0.000%{opacity:0} 1.562%{opacity:1} 10.938%{opacity:1} 12.500%{opacity:0} 100.000%{opacity:0}}@keyframes sp0{0.000%{opacity:0.0} 1.562%{opacity:1} 10.938%{opacity:1} 12.500%{opacity:0.0} 100.000%{opacity:0.0}}@keyframes cap0{0.000%{opacity:0} 1.562%{opacity:1} 10.938%{opacity:1} 12.500%{opacity:0} 100.000%{opacity:0}}.on0{animation:st0 16s linear infinite}.spk0{stroke-dasharray:6 6;animation:sp0 16s linear infinite,flow .8s linear infinite}.cap0{animation:cap0 16s linear infinite}@keyframes st1{0.000%{opacity:0} 12.500%{opacity:0} 14.062%{opacity:1} 23.438%{opacity:1} 25.000%{opacity:0} 100.000%{opacity:0}}@keyframes sp1{0.000%{opacity:0.0} 12.500%{opacity:0.0} 14.062%{opacity:1} 23.438%{opacity:1} 25.000%{opacity:0.0} 100.000%{opacity:0.0}}@keyframes cap1{0.000%{opacity:0} 12.500%{opacity:0} 14.062%{opacity:1} 23.438%{opacity:1} 25.000%{opacity:0} 100.000%{opacity:0}}.on1{animation:st1 16s linear infinite}.spk1{stroke-dasharray:6 6;animation:sp1 16s linear infinite,flow .8s linear infinite}.cap1{animation:cap1 16s linear infinite}@keyframes st2{0.000%{opacity:0} 25.000%{opacity:0} 26.562%{opacity:1} 35.938%{opacity:1} 37.500%{opacity:0} 100.000%{opacity:0}}@keyframes sp2{0.000%{opacity:0.0} 25.000%{opacity:0.0} 26.562%{opacity:1} 35.938%{opacity:1} 37.500%{opacity:0.0} 100.000%{opacity:0.0}}@keyframes cap2{0.000%{opacity:0} 25.000%{opacity:0} 26.562%{opacity:1} 35.938%{opacity:1} 37.500%{opacity:0} 100.000%{opacity:0}}.on2{animation:st2 16s linear infinite}.spk2{stroke-dasharray:6 6;animation:sp2 16s linear infinite,flow .8s linear infinite}.cap2{animation:cap2 16s linear infinite}@keyframes st3{0.000%{opacity:0} 37.500%{opacity:0} 39.062%{opacity:1} 48.438%{opacity:1} 50.000%{opacity:0} 100.000%{opacity:0}}@keyframes sp3{0.000%{opacity:0.0} 37.500%{opacity:0.0} 39.062%{opacity:1} 48.438%{opacity:1} 50.000%{opacity:0.0} 100.000%{opacity:0.0}}@keyframes cap3{0.000%{opacity:0} 37.500%{opacity:0} 39.062%{opacity:1} 48.438%{opacity:1} 50.000%{opacity:0} 100.000%{opacity:0}}.on3{animation:st3 16s linear infinite}.spk3{stroke-dasharray:6 6;animation:sp3 16s linear infinite,flow .8s linear infinite}.cap3{animation:cap3 16s linear infinite}@keyframes st4{0.000%{opacity:0} 50.000%{opacity:0} 51.562%{opacity:1} 60.938%{opacity:1} 62.500%{opacity:0} 100.000%{opacity:0}}@keyframes sp4{0.000%{opacity:0.0} 50.000%{opacity:0.0} 51.562%{opacity:1} 60.938%{opacity:1} 62.500%{opacity:0.0} 100.000%{opacity:0.0}}@keyframes cap4{0.000%{opacity:0} 50.000%{opacity:0} 51.562%{opacity:1} 60.938%{opacity:1} 62.500%{opacity:0} 100.000%{opacity:0}}.on4{animation:st4 16s linear infinite}.spk4{stroke-dasharray:6 6;animation:sp4 16s linear infinite,flow .8s linear infinite}.cap4{animation:cap4 16s linear infinite}@keyframes st5{0.000%{opacity:0} 62.500%{opacity:0} 64.062%{opacity:1} 73.438%{opacity:1} 75.000%{opacity:0} 100.000%{opacity:0}}@keyframes sp5{0.000%{opacity:0.0} 62.500%{opacity:0.0} 64.062%{opacity:1} 73.438%{opacity:1} 75.000%{opacity:0.0} 100.000%{opacity:0.0}}@keyframes cap5{0.000%{opacity:0} 62.500%{opacity:0} 64.062%{opacity:1} 73.438%{opacity:1} 75.000%{opacity:0} 100.000%{opacity:0}}.on5{animation:st5 16s linear infinite}.spk5{stroke-dasharray:6 6;animation:sp5 16s linear infinite,flow .8s linear infinite}.cap5{animation:cap5 16s linear infinite}@keyframes st6{0.000%{opacity:0} 75.000%{opacity:0} 76.562%{opacity:1} 85.938%{opacity:1} 87.500%{opacity:0} 100.000%{opacity:0}}@keyframes sp6{0.000%{opacity:0.0} 75.000%{opacity:0.0} 76.562%{opacity:1} 85.938%{opacity:1} 87.500%{opacity:0.0} 100.000%{opacity:0.0}}@keyframes cap6{0.000%{opacity:0} 75.000%{opacity:0} 76.562%{opacity:1} 85.938%{opacity:1} 87.500%{opacity:0} 100.000%{opacity:0}}.on6{animation:st6 16s linear infinite}.spk6{stroke-dasharray:6 6;animation:sp6 16s linear infinite,flow .8s linear infinite}.cap6{animation:cap6 16s linear infinite}@keyframes st7{0.000%{opacity:0} 87.500%{opacity:0} 89.062%{opacity:1} 98.438%{opacity:1} 100.000%{opacity:0}}@keyframes sp7{0.000%{opacity:0.0} 87.500%{opacity:0.0} 89.062%{opacity:1} 98.438%{opacity:1} 100.000%{opacity:0.0}}@keyframes cap7{0.000%{opacity:0} 87.500%{opacity:0} 89.062%{opacity:1} 98.438%{opacity:1} 100.000%{opacity:0}}.on7{animation:st7 16s linear infinite}.spk7{stroke-dasharray:6 6;animation:sp7 16s linear infinite,inflow .8s linear infinite}.cap7{animation:cap7 16s linear infinite}@keyframes hub{0.000%{opacity:0} 1.562%{opacity:1} 10.938%{opacity:1} 12.500%{opacity:0} 87.500%{opacity:0} 89.062%{opacity:1} 98.438%{opacity:1} 100.000%{opacity:0}}.hubglow{animation:hub 16s linear infinite}@keyframes grow{0%,91.25%{opacity:0;transform:scale(.2)}94.38%,97%{opacity:1;transform:scale(1)}100%{opacity:0}}.newnode{transform-box:fill-box;transform-origin:center;animation:grow 16s ease-out infinite}@keyframes flow{to{stroke-dashoffset:-24}}@keyframes inflow{to{stroke-dashoffset:24}}@keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}.breathe{animation:breathe 3s ease-in-out infinite}@media (prefers-reduced-motion:reduce){*{animation:none!important}.cand{offset-distance:0%}.on0,.spk0,.cap0{opacity:1}}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}</style>
+<rect x="1" y="1" width="1198" height="658" rx="18" fill="#151b23" stroke="#30363d"/>
+<text x="34" y="46" font-size="13" letter-spacing="2.5" fill="#9198a1" class="mono">THE VANGUARD LOOP</text>
+<text x="34" y="70" font-size="13" fill="#9198a1">rank → build → validate → run → learn → repeat</text>
+<ellipse cx="600" cy="318" rx="452" ry="232" fill="none" stroke="#30363d" stroke-width="2" stroke-dasharray="2 7"/>
+<line x1="600.0" y1="196.0" x2="600.0" y2="130.0" stroke="#2a3341" stroke-width="1.2"/>
+<line class="spk0" x1="600.0" y1="196.0" x2="600.0" y2="130.0" stroke="#8d9cff" stroke-width="2.6" opacity="0"/>
+<line x1="708.5" y1="262.3" x2="880.5" y2="174.0" stroke="#2a3341" stroke-width="1.2"/>
+<line class="spk1" x1="708.5" y1="262.3" x2="880.5" y2="174.0" stroke="#8d9cff" stroke-width="2.6" opacity="0"/>
+<line x1="722.0" y1="318.0" x2="1008.0" y2="318.0" stroke="#2a3341" stroke-width="1.2"/>
+<line class="spk2" x1="722.0" y1="318.0" x2="1008.0" y2="318.0" stroke="#8d9cff" stroke-width="2.6" opacity="0"/>
+<line x1="708.5" y1="373.7" x2="880.5" y2="462.0" stroke="#2a3341" stroke-width="1.2"/>
+<line class="spk3" x1="708.5" y1="373.7" x2="880.5" y2="462.0" stroke="#8d9cff" stroke-width="2.6" opacity="0"/>
+<line x1="600.0" y1="490.0" x2="600.0" y2="506.0" stroke="#2a3341" stroke-width="1.2"/>
+<line class="spk4" x1="600.0" y1="490.0" x2="600.0" y2="506.0" stroke="#8d9cff" stroke-width="2.6" opacity="0"/>
+<line x1="491.5" y1="373.7" x2="319.5" y2="462.0" stroke="#2a3341" stroke-width="1.2"/>
+<line class="spk5" x1="491.5" y1="373.7" x2="319.5" y2="462.0" stroke="#8d9cff" stroke-width="2.6" opacity="0"/>
+<line x1="478.0" y1="318.0" x2="192.0" y2="318.0" stroke="#2a3341" stroke-width="1.2"/>
+<line class="spk6" x1="478.0" y1="318.0" x2="192.0" y2="318.0" stroke="#8d9cff" stroke-width="2.6" opacity="0"/>
+<line x1="491.5" y1="262.3" x2="319.5" y2="174.0" stroke="#2a3341" stroke-width="1.2"/>
+<line class="spk7" x1="491.5" y1="262.3" x2="319.5" y2="174.0" stroke="#8d9cff" stroke-width="2.6" opacity="0"/>
+<circle class="hubglow" cx="600" cy="318" r="130" fill="url(#halo)" opacity="0"/>
+<g class="breathe">
+<line x1="600.0" y1="318.0" x2="649.5" y2="318.0" stroke="#9198a1" stroke-width="1"/>
+<line x1="600.0" y1="318.0" x2="557.5" y2="353.0" stroke="#9198a1" stroke-width="1"/>
+<line x1="600.0" y1="318.0" x2="605.6" y2="260.8" stroke="#9198a1" stroke-width="1"/>
+<line x1="600.0" y1="318.0" x2="527.5" y2="306.5" stroke="#9198a1" stroke-width="1"/>
+<line x1="600.0" y1="318.0" x2="560.8" y2="250.0" stroke="#9198a1" stroke-width="1"/>
+<line x1="649.5" y1="318.0" x2="557.5" y2="353.0" stroke="#9198a1" stroke-width="1"/>
+<line x1="605.6" y1="260.8" x2="642.0" y2="367.3" stroke="#9198a1" stroke-width="1"/>
+<line x1="527.5" y1="306.5" x2="665.6" y2="280.4" stroke="#9198a1" stroke-width="1"/>
+<line x1="578.8" y1="388.9" x2="560.8" y2="250.0" stroke="#9198a1" stroke-width="1"/>
+<line x1="683.1" y1="345.3" x2="515.3" y2="349.5" stroke="#9198a1" stroke-width="1"/>
+<line x1="640.1" y1="240.8" x2="629.2" y2="401.8" stroke="#9198a1" stroke-width="1"/>
+<line x1="513.2" y1="272.7" x2="700.6" y2="298.1" stroke="#9198a1" stroke-width="1"/>
+<line x1="649.5" y1="318.0" x2="665.6" y2="280.4" stroke="#9198a1" stroke-width="1"/>
+<line x1="642.0" y1="367.3" x2="683.1" y2="345.3" stroke="#9198a1" stroke-width="1"/>
+<line x1="578.8" y1="388.9" x2="629.2" y2="401.8" stroke="#9198a1" stroke-width="1"/>
+<line x1="515.3" y1="349.5" x2="539.3" y2="395.7" stroke="#9198a1" stroke-width="1"/>
+<line x1="557.5" y1="353.0" x2="683.1" y2="345.3" stroke="#9198a1" stroke-width="1"/>
+<line x1="642.0" y1="367.3" x2="629.2" y2="401.8" stroke="#9198a1" stroke-width="1"/>
+<line x1="665.6" y1="280.4" x2="586.1" y2="221.6" stroke="#9198a1" stroke-width="1"/>
+<line x1="605.6" y1="260.8" x2="700.6" y2="298.1" stroke="#9198a1" stroke-width="1"/>
+</g>
+<circle cx="600.0" cy="318.0" r="11.0" fill="#e6edf3"/>
+<circle cx="649.5" cy="318.0" r="5.0" fill="#f06a7e"/>
+<circle cx="557.5" cy="353.0" r="6.0" fill="#e3a54a"/>
+<circle cx="605.6" cy="260.8" r="7.0" fill="#68a6ea"/>
+<circle cx="642.0" cy="367.3" r="5.0" fill="#ab88ef"/>
+<circle cx="527.5" cy="306.5" r="6.0" fill="#4cc292"/>
+<circle cx="665.6" cy="280.4" r="7.0" fill="#78c0cc"/>
+<circle cx="578.8" cy="388.9" r="5.0" fill="#f06a7e"/>
+<circle cx="560.8" cy="250.0" r="6.0" fill="#e3a54a"/>
+<circle cx="683.1" cy="345.3" r="7.0" fill="#68a6ea"/>
+<circle cx="515.3" cy="349.5" r="5.0" fill="#ab88ef"/>
+<circle cx="640.1" cy="240.8" r="6.0" fill="#4cc292"/>
+<circle cx="629.2" cy="401.8" r="7.0" fill="#78c0cc"/>
+<circle cx="513.2" cy="272.7" r="5.0" fill="#f06a7e"/>
+<circle cx="700.6" cy="298.1" r="6.0" fill="#e3a54a"/>
+<circle cx="539.3" cy="395.7" r="7.0" fill="#68a6ea"/>
+<circle cx="586.1" cy="221.6" r="5.0" fill="#ab88ef"/>
+<g class="newnode"><line x1="527.5" y1="306.5" x2="696.0" y2="266.0" stroke="#ffc35a" stroke-width="1.6"/><circle cx="696.0" cy="266.0" r="6.5" fill="#68a6ea" stroke="#ffc35a" stroke-width="2"/></g>
+<text x="600" y="456" text-anchor="middle" font-size="15" font-weight="700" fill="#e6edf3">Knowledge graph</text>
+<text x="600" y="475" text-anchor="middle" font-size="12" fill="#9198a1" class="mono">weaknesses · evidence · outcomes</text>
+<g class="cand"><circle r="15" fill="#ffc35a" opacity=".25" filter="url(#glow)"/><circle r="8" fill="#ffc35a" filter="url(#glow)"/><circle r="3.5" fill="#fff"/></g>
+<rect x="474.0" y="53.0" width="252" height="66" rx="12" fill="#0d1117" stroke="#30363d" stroke-width="1.4"/>
+<rect class="on0" x="474.0" y="53.0" width="252" height="66" rx="12" fill="#1b2242" stroke="#8d9cff" stroke-width="2.4" opacity="0"/>
+<circle cx="498.0" cy="86.0" r="13" fill="#8d9cff"/>
+<text x="498.0" y="90.5" text-anchor="middle" font-size="13" font-weight="700" fill="#151b23">1</text>
+<text x="520.0" y="82.0" font-size="15" font-weight="700" fill="#e6edf3">Consult the graph</text>
+<text x="520.0" y="101.0" font-size="11.5" fill="#9198a1" class="mono">what defeats each model?</text>
+<text x="716.0" y="67.0" text-anchor="end" font-size="10" font-weight="700" fill="#3fb950" class="mono">FREE</text>
+<rect x="793.6" y="121.0" width="252" height="66" rx="12" fill="#0d1117" stroke="#30363d" stroke-width="1.4"/>
+<rect class="on1" x="793.6" y="121.0" width="252" height="66" rx="12" fill="#1b2242" stroke="#8d9cff" stroke-width="2.4" opacity="0"/>
+<circle cx="817.6" cy="154.0" r="13" fill="#8d9cff"/>
+<text x="817.6" y="158.5" text-anchor="middle" font-size="13" font-weight="700" fill="#151b23">2</text>
+<text x="839.6" y="150.0" font-size="15" font-weight="700" fill="#e6edf3">Rank advisories</text>
+<text x="839.6" y="169.0" font-size="11.5" fill="#9198a1" class="mono">1,928 scored · ~12 s · $0</text>
+<text x="1035.6" y="135.0" text-anchor="end" font-size="10" font-weight="700" fill="#3fb950" class="mono">FREE</text>
+<rect x="926.0" y="285.0" width="252" height="66" rx="12" fill="#0d1117" stroke="#30363d" stroke-width="1.4"/>
+<rect class="on2" x="926.0" y="285.0" width="252" height="66" rx="12" fill="#1b2242" stroke="#8d9cff" stroke-width="2.4" opacity="0"/>
+<circle cx="950.0" cy="318.0" r="13" fill="#8d9cff"/>
+<text x="950.0" y="322.5" text-anchor="middle" font-size="13" font-weight="700" fill="#151b23">3</text>
+<text x="972.0" y="314.0" font-size="15" font-weight="700" fill="#e6edf3">Narrow down</text>
+<text x="972.0" y="333.0" font-size="11.5" fill="#9198a1" class="mono">1,928 → 1,590 → top 3</text>
+<text x="1168.0" y="299.0" text-anchor="end" font-size="10" font-weight="700" fill="#3fb950" class="mono">FREE</text>
+<rect x="793.6" y="449.0" width="252" height="66" rx="12" fill="#0d1117" stroke="#30363d" stroke-width="1.4"/>
+<rect class="on3" x="793.6" y="449.0" width="252" height="66" rx="12" fill="#1b2242" stroke="#8d9cff" stroke-width="2.4" opacity="0"/>
+<circle cx="817.6" cy="482.0" r="13" fill="#8d9cff"/>
+<text x="817.6" y="486.5" text-anchor="middle" font-size="13" font-weight="700" fill="#151b23">4</text>
+<text x="839.6" y="478.0" font-size="15" font-weight="700" fill="#e6edf3">Build the task</text>
+<text x="839.6" y="497.0" font-size="11.5" fill="#9198a1" class="mono">AI agent · budgeted</text>
+<text x="1035.6" y="463.0" text-anchor="end" font-size="10" font-weight="700" fill="#ab7df8" class="mono">PAID</text>
+<rect x="474.0" y="517.0" width="252" height="66" rx="12" fill="#0d1117" stroke="#d29922" stroke-width="1.4"/>
+<rect class="on4" x="474.0" y="517.0" width="252" height="66" rx="12" fill="#1b2242" stroke="#8d9cff" stroke-width="2.4" opacity="0"/>
+<circle cx="498.0" cy="550.0" r="13" fill="#8d9cff"/>
+<text x="498.0" y="554.5" text-anchor="middle" font-size="13" font-weight="700" fill="#151b23">5</text>
+<text x="520.0" y="546.0" font-size="15" font-weight="700" fill="#e6edf3">You approve</text>
+<text x="520.0" y="565.0" font-size="11.5" fill="#9198a1" class="mono">gate 1</text>
+<text x="716.0" y="531.0" text-anchor="end" font-size="10" font-weight="700" fill="#d29922" class="mono">YOU DECIDE</text>
+<rect x="154.4" y="449.0" width="252" height="66" rx="12" fill="#0d1117" stroke="#30363d" stroke-width="1.4"/>
+<rect class="on5" x="154.4" y="449.0" width="252" height="66" rx="12" fill="#1b2242" stroke="#8d9cff" stroke-width="2.4" opacity="0"/>
+<circle cx="178.4" cy="482.0" r="13" fill="#8d9cff"/>
+<text x="178.4" y="486.5" text-anchor="middle" font-size="13" font-weight="700" fill="#151b23">6</text>
+<text x="200.4" y="478.0" font-size="15" font-weight="700" fill="#e6edf3">Validate</text>
+<text x="200.4" y="497.0" font-size="11.5" fill="#9198a1" class="mono">fix ✓✓ · none ✗ · partial ½</text>
+<text x="396.4" y="463.0" text-anchor="end" font-size="10" font-weight="700" fill="#3fb950" class="mono">FREE</text>
+<rect x="22.0" y="285.0" width="252" height="66" rx="12" fill="#0d1117" stroke="#30363d" stroke-width="1.4"/>
+<rect class="on6" x="22.0" y="285.0" width="252" height="66" rx="12" fill="#1b2242" stroke="#8d9cff" stroke-width="2.4" opacity="0"/>
+<circle cx="46.0" cy="318.0" r="13" fill="#8d9cff"/>
+<text x="46.0" y="322.5" text-anchor="middle" font-size="13" font-weight="700" fill="#151b23">7</text>
+<text x="68.0" y="314.0" font-size="15" font-weight="700" fill="#e6edf3">Run the models</text>
+<text x="68.0" y="333.0" font-size="11.5" fill="#9198a1" class="mono">Model A ✗ · Model B ✗</text>
+<text x="264.0" y="299.0" text-anchor="end" font-size="10" font-weight="700" fill="#ab7df8" class="mono">PAID</text>
+<rect x="154.4" y="121.0" width="252" height="66" rx="12" fill="#0d1117" stroke="#30363d" stroke-width="1.4"/>
+<rect class="on7" x="154.4" y="121.0" width="252" height="66" rx="12" fill="#1b2242" stroke="#8d9cff" stroke-width="2.4" opacity="0"/>
+<circle cx="178.4" cy="154.0" r="13" fill="#8d9cff"/>
+<text x="178.4" y="158.5" text-anchor="middle" font-size="13" font-weight="700" fill="#151b23">8</text>
+<text x="200.4" y="150.0" font-size="15" font-weight="700" fill="#e6edf3">Learn</text>
+<text x="200.4" y="169.0" font-size="11.5" fill="#9198a1" class="mono">forecast scored · retrain</text>
+<text x="396.4" y="135.0" text-anchor="end" font-size="10" font-weight="700" fill="#3fb950" class="mono">FREE</text>
+<g class="cap0" opacity="0"><text x="600" y="638" text-anchor="middle" font-size="16" fill="#e6edf3"><tspan font-weight="700" fill="#8d9cff">1 · Consult the graph.</tspan> The agent consults the knowledge graph: which weaknesses defeat which model, under what conditions, on how much evidence.</text></g>
+<g class="cap1" opacity="0"><text x="600" y="638" text-anchor="middle" font-size="16" fill="#e6edf3"><tspan font-weight="700" fill="#8d9cff">2 · Rank advisories.</tspan> Every real security advisory is scored with each model's chance of failing, plus the reasons and the evidence behind it.</text></g>
+<g class="cap2" opacity="0"><text x="600" y="638" text-anchor="middle" font-size="16" fill="#e6edf3"><tspan font-weight="700" fill="#8d9cff">3 · Narrow down.</tspan> Unbuildable, duplicate and already-built candidates drop out. The strongest few get a complete build package.</text></g>
+<g class="cap3" opacity="0"><text x="600" y="638" text-anchor="middle" font-size="16" fill="#e6edf3"><tspan font-weight="700" fill="#8d9cff">4 · Build the task.</tspan> An AI agent triages the fix and builds a Docker task: the vulnerable code, an impact-only report, hidden tests.</text></g>
+<g class="cap4" opacity="0"><text x="600" y="638" text-anchor="middle" font-size="16" fill="#e6edf3"><tspan font-weight="700" fill="#8d9cff">5 · You approve.</tspan> A person reviews the built task. Nothing that costs money or can't be undone happens without approval.</text></g>
+<g class="cap5" opacity="0"><text x="600" y="638" text-anchor="middle" font-size="16" fill="#e6edf3"><tspan font-weight="700" fill="#8d9cff">6 · Validate.</tspan> Fairness checks in Docker: the real fix scores 1.0 twice, no fix scores 0, a partial fix lands in between.</text></g>
+<g class="cap6" opacity="0"><text x="600" y="638" text-anchor="middle" font-size="16" fill="#e6edf3"><tspan font-weight="700" fill="#8d9cff">7 · Run the models.</tspan> Model A and Model B attempt the task. A solve ends it at once; a double failure earns more attempts at gate 2.</text></g>
+<g class="cap7" opacity="0"><text x="600" y="638" text-anchor="middle" font-size="16" fill="#e6edf3"><tspan font-weight="700" fill="#8d9cff">8 · Learn.</tspan> Results flow back into the graph: the forecast is scored, the predictor retrains, and the next ranking is sharper.</text></g>
+</svg></div>
+    <div class="stages">
+      <div class="stg" style="--i:0"><div class="n">STAGE 1</div><h3>🧠 Knowledge Graph</h3><p>Remembers every task, run and outcome, and learns which weaknesses beat which model.</p><div class="file">knowledge_graph.py · learner.py</div></div>
+      <div class="stg" style="--i:1"><div class="n">STAGE 2</div><h3>🔎 Harvester</h3><p>Pulls real security fixes from GitHub and scores each one's chance of beating each model.</p><div class="file">harvester.py · rank</div></div>
+      <div class="stg" style="--i:2"><div class="n">STAGE 3</div><h3>🛠️ Synthesizer</h3><p>An AI agent turns the best candidates into sealed Docker tasks. A person approves each one.</p><div class="file">loop.py</div></div>
+      <div class="stg" style="--i:3"><div class="n">STAGE 4</div><h3>⚖️ Judge</h3><p>Proves each task is fair, runs the models behind budgets, and sends results back.</p><div class="file">validate.py · collect</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 5 HARVEST ============================== -->
+<section class="band" id="harvest" data-anim>
+  <div class="wrap">
+    <div class="kicker">05 · Harvester</div>
+    <h2>From 1,928 real vulnerabilities to the few worth building.</h2>
+    <p class="lead">It reads every fix line by line, the way a reviewer would: where is the check? Is there a separate
+      piece of code that saves or reloads the data? Does a security field get dropped on the way? Each answer moves
+      the score.</p>
+    <div class="grid2" style="align-items:start">
+      <div>
+        <div class="card"><div class="pool" id="pool" aria-label="Illustration: the advisory pool, filtered down to a shortlist"></div></div>
+        <div class="funnel">
+          <div class="fn"><div class="b" style="--w:100%;--i:0">reviewed advisories with a fix commit</div><div class="v">1,932</div></div>
+          <div class="fn"><div class="b" style="--w:99%;--i:1">fix patch read and scored</div><div class="v">1,928</div></div>
+          <div class="fn"><div class="b" style="--w:82%;--i:2">buildable, not already built, one per fix</div><div class="v">1,590</div></div>
+          <div class="fn"><div class="b" style="--w:24%;--i:3">shortlist</div><div class="v">top 3</div></div>
+        </div>
+      </div>
+      <div class="score">
+        <div class="sc"><div class="t"><span><b>Candidate 1</b> · Python web app</span><span>check + data producer</span></div>
+          <div class="row"><span>Model A</span><div class="track"><i style="--p:94%;--i:0"></i></div><span class="mono">0.94</span></div>
+          <div class="row"><span>Model B</span><div class="track"><i style="--p:66%;--i:1"></i></div><span class="mono">0.66</span></div>
+          <div class="why"><span class="tag">producer drops a security field</span><span class="tag">save/load boundary</span></div></div>
+        <div class="sc"><div class="t"><span><b>Candidate 2</b> · Go admin UI</span><span>check + data producer</span></div>
+          <div class="row"><span>Model A</span><div class="track"><i style="--p:91%;--i:2"></i></div><span class="mono">0.91</span></div>
+          <div class="row"><span>Model B</span><div class="track"><i style="--p:57%;--i:3"></i></div><span class="mono">0.57</span></div>
+          <div class="why"><span class="tag">shared field: role</span><span class="tag">check doesn't call the producer</span></div></div>
+        <div class="sc"><div class="t"><span><b>Candidate 3</b> · JS library</span><span>single file</span></div>
+          <div class="row"><span>Model A</span><div class="track"><i style="--p:18%;--i:4"></i></div><span class="mono">0.18</span></div>
+          <div class="row"><span>Model B</span><div class="track"><i style="--p:12%;--i:5"></i></div><span class="mono">0.12</span></div>
+          <div class="why"><span class="tag">one missing check: models solve these</span></div></div>
+        <div class="note">Each bar is the predicted chance that a model fails one attempt. Candidates and scores here are
+          illustrative; the funnel counts are from a real run.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 6 LEARN ============================== -->
+<section class="band alt" id="learn" data-anim>
+  <div class="wrap">
+    <div class="kicker">06 · It learns</div>
+    <h2>Every result makes the next prediction better.</h2>
+    <p class="lead">We test the predictor the hard way: hide an entire repository, train on the rest, and score its
+      predictions on the hidden one. The Brier score measures how far predictions land from reality (lower is better).</p>
+    <div class="brier">
+      <div class="br" style="--i:0"><span>Overall fail rate</span><div class="track"><i style="--w:98.5%;--c:#5A6587"></i></div><span class="v">0.394</span></div>
+      <div class="br" style="--i:1"><span>Expert-set weights</span><div class="track"><i style="--w:80%;--c:#8590AD"></i></div><span class="v">0.320</span></div>
+      <div class="br best" style="--i:2"><span>Vanguard, learned</span><div class="track"><i style="--w:57.5%;--c:linear-gradient(90deg,#4CC292,#6ED3E0)"></i></div><span class="v">0.230</span></div>
+    </div>
+    <div class="loopfacts">
+      <div class="lf"><b>Forecasts are frozen</b>Every prediction is saved before a task is built, then scored against what really happened.</div>
+      <div class="lf"><b>Honest about evidence</b>Every score says how many tasks and repositories back it. One repository is a hypothesis, not a fact.</div>
+      <div class="lf"><b>Starts useful on day one</b>With no history it uses expert weights, then learns from each graded task.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 7 JUDGE ============================== -->
+<section class="band" id="judge" data-anim>
+  <div class="wrap grid2" style="align-items:start">
+    <div>
+      <div class="kicker">07 · The Judge</div>
+      <h2>No unfair task gets through. No money moves without you.</h2>
+      <p class="lead">A task is only useful if failing it means the model really failed. Before any model runs, every
+        task has to prove it is fair, automatically.</p>
+      <div class="gates">
+        <div class="gate"><b>Gate 1</b><span>You approve each built task before it is validated.</span></div>
+        <div class="gate"><b>Gate 2</b><span>You approve more attempts only after both models fail round one.</span></div>
+      </div>
+      <div class="money">
+        <div><span>Rank, graph, learn, validate</span><span class="free">FREE</span></div>
+        <div><span>AI build agent, model runs</span><span class="paid">BUDGETED + GATED</span></div>
+        <div><span>A model solves it</span><span class="free">STOPS SPENDING</span></div>
+      </div>
+    </div>
+    <div class="checks">
+      <div class="ck ok" style="--i:0"><span class="m">✓</span><span>The real fix scores 1.0, twice</span><span class="r">oracle ×2</span></div>
+      <div class="ck ok" style="--i:1"><span class="m">✓</span><span>No fix scores 0, legitimate use still works</span><span class="r">nop</span></div>
+      <div class="ck half" style="--i:2"><span class="m">½</span><span>A half fix lands in between</span><span class="r">check-only</span></div>
+      <div class="ck ok" style="--i:3"><span class="m">✓</span><span>No git history, advisory or hidden tests leak into the image</span><span class="r">leak scan</span></div>
+      <div class="ck ok" style="--i:4"><span class="m">✓</span><span>The report describes impact only, no fix location</span><span class="r">static</span></div>
+      <div class="ck drop" style="--i:5"><span class="m">✗</span><span>A half fix that closes every attack? <b>Task dropped.</b></span><span class="r">reproduced on real Docker</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== 8 TRUST + TRY ============================== -->
+<section class="band alt" id="try" data-anim>
+  <div class="wrap">
+    <div class="kicker">08 · Try it</div>
+    <h2>See the whole pipeline run in about a second.</h2>
+    <p class="lead">One command, no install, no API keys, no Docker. The demo runs the real code through all four stages
+      on synthetic data and ends with an accepted benchmark task.</p>
+    <div class="term">
+      <div class="top"><span>terminal</span><button class="copy" id="copy" type="button">Copy command</button></div>
+<pre id="cmd"><span class="p">$</span> git clone https://github.com/abdulhadiadnan1080/Vanguard.git && cd Vanguard && python3 main.py --demo
+<span class="h">[1/4] Knowledge graph</span>  <span class="c">60 graded tasks, 246 trials · held-out Brier 0.146 → 0.063 → 0.050</span>
+<span class="h">[2/4] Harvester</span>        <span class="c">40 candidates scored for Model A and Model B</span>
+<span class="h">[3/4] Synthesizer</span>      <span class="c">agent builds 1 task, rejects 1 at triage · gate 1 approved</span>
+<span class="h">[4/4] Judge</span>            <span class="c">fair ✓ · round 1 failed · gate 2 · round 2 failed</span>
+<span class="y">Done.</span>  GHSA-demo-0016 accepted <span class="c">(failed by both models on every attempt)</span></pre>
+    </div>
+    <div class="trust" style="margin-top:22px">
+      <div class="tr"><b>Pure standard library</b><span>Python 3.9+, nothing to install. Graph, statistics and solver are written from scratch.</span></div>
+      <div class="tr"><b>Works from a fresh clone</b><span>Pulls real advisories from GitHub and ranks them with nothing but Python.</span></div>
+      <div class="tr"><b>30 tests, fully isolated</b><span>Including the complete loop, a crashed run, a rejected build and a model that wins.</span></div>
+    </div>
+    <div class="cta" style="margin-top:28px">
+      <a class="btn primary" href="https://github.com/abdulhadiadnan1080/Vanguard">View on GitHub</a>
+      <a class="btn" href="graph.html">Open the knowledge graph</a>
+    </div>
+  </div>
+</section>
+
+<footer class="end"><div class="wrap"><span>Vanguard · built by <b style="color:var(--fg)">Abdul Hadi Adnan</b></span>
+  <span>Models are anonymised as Model A and Model B.</span></div></footer>
+
+<script>
+(function () {
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- hero: a living knowledge graph ---------- */
+  var cv = document.getElementById("net"), ctx = cv.getContext("2d"), W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var COLORS = ["#f06a7e", "#e3a54a", "#68a6ea", "#ab88ef", "#4cc292", "#78c0cc", "#d88aca", "#9cb0c7"];
+  var nodes = [], pulses = [], rnd = (function (s) { return function () { s = (s * 16807) % 2147483647; return s / 2147483647; }; })(7);
+  function size() {
+    W = cv.clientWidth; H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function init() {
+    size(); nodes = [];
+    var n = Math.round(Math.min(110, Math.max(46, W * H / 15000)));
+    for (var i = 0; i < n; i++) nodes.push({ x: rnd() * W, y: rnd() * H, vx: (rnd() - .5) * .25, vy: (rnd() - .5) * .25,
+      r: 2 + rnd() * 3.2, c: COLORS[i % COLORS.length], big: rnd() < .08 });
+  }
+  function draw(move) {
+    ctx.clearRect(0, 0, W, H);
+    var LINK = Math.min(170, W / 7);
+    for (var i = 0; i < nodes.length; i++) {
+      var a = nodes[i];
+      if (move) { a.x += a.vx; a.y += a.vy; if (a.x < 0 || a.x > W) a.vx *= -1; if (a.y < 0 || a.y > H) a.vy *= -1; }
+      for (var j = i + 1; j < nodes.length; j++) {
+        var b = nodes[j], dx = a.x - b.x, dy = a.y - b.y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d < LINK) {
+          ctx.strokeStyle = "rgba(124,140,255," + (0.22 * (1 - d / LINK)).toFixed(3) + ")"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+          if (move && rnd() < 0.0009) pulses.push({ a: a, b: b, t: 0 });
+        }
+      }
+    }
+    for (var k = pulses.length - 1; k >= 0; k--) {
+      var p = pulses[k]; p.t += 0.018; if (p.t >= 1) { pulses.splice(k, 1); continue; }
+      var px = p.a.x + (p.b.x - p.a.x) * p.t, py = p.a.y + (p.b.y - p.a.y) * p.t;
+      ctx.fillStyle = "rgba(255,195,90," + (1 - p.t).toFixed(2) + ")"; ctx.beginPath(); ctx.arc(px, py, 2.6, 0, 6.283); ctx.fill();
+    }
+    for (var m = 0; m < nodes.length; m++) {
+      var q = nodes[m];
+      if (q.big) { ctx.fillStyle = q.c + "33"; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * 3.2, 0, 6.283); ctx.fill(); }
+      ctx.fillStyle = q.c; ctx.beginPath(); ctx.arc(q.x, q.y, q.big ? q.r * 1.6 : q.r, 0, 6.283); ctx.fill();
+    }
+  }
+  init(); draw(false);
+  var heroVisible = true;
+  if (!reduce) (function loop() { if (heroVisible) draw(true); requestAnimationFrame(loop); })();
+  window.addEventListener("resize", function () { init(); draw(false); });
+
+  /* ---------- count-ups ---------- */
+  function countUp(el) {
+    var target = +el.dataset.count, suffix = el.dataset.suffix || "", sep = el.hasAttribute("data-sep");
+    var fmt = function (v) { v = Math.round(v); return (sep ? v.toLocaleString("en-US") : v) + suffix; };
+    if (reduce || target === 0) { el.textContent = fmt(target); return; }
+    var t0 = null;
+    (function step(ts) { t0 = t0 || ts; var k = Math.min(1, (ts - t0) / 1400); el.textContent = fmt(target * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(step); })(performance.now());
+  }
+  /* without JS or before scrolling, numbers already show their final values */
+  document.querySelectorAll("[data-count]").forEach(function (el) {
+    var v = +el.dataset.count; el.textContent = (el.hasAttribute("data-sep") ? v.toLocaleString("en-US") : v) + (el.dataset.suffix || "");
+  });
+
+  /* ---------- illustrations built from data ---------- */
+  var tg = document.getElementById("taskgrid");
+  for (var i = 0; i < 60; i++) { var d = document.createElement("div"); var failed = [7, 23, 41, 52].indexOf(i) >= 0;
+    d.className = "tk " + (failed ? "failed" : "solved"); d.style.setProperty("--i", i); tg.appendChild(d); }
+  var pool = document.getElementById("pool"), tops = [37, 101, 158];
+  for (var j = 0; j < 240; j++) { var c = document.createElement("div");
+    c.className = "pl " + (tops.indexOf(j) >= 0 ? "top" : (j % 6 === 0 || j % 11 === 0 || j % 7 === 0 ? "" : "out"));
+    c.style.setProperty("--i", j); pool.appendChild(c); }
+
+  /* ---------- the discovery replay (scripted timeline) ---------- */
+  var svg = document.getElementById("story"), agent = svg.querySelector(".agent"), attack = svg.querySelector(".attack");
+  var steps = document.querySelectorAll("#storySteps div"), cap = document.getElementById("storyCaption");
+  var show = function (sel, on) { var el = svg.querySelector(sel); el.style.transition = "opacity .5s"; el.setAttribute("opacity", on ? 1 : 0); };
+  function moveTo(el, x, y, ms) { el.style.transition = "transform " + ms + "ms cubic-bezier(.4,0,.2,1)"; el.setAttribute("transform", "translate(" + x + "," + y + ")"); }
+  var timers = [];
+  function later(ms, fn) { timers.push(setTimeout(fn, ms)); }
+  function setStep(k, text) { steps.forEach(function (s, n) { s.classList.toggle("now", n === k); }); cap.textContent = text; }
+  function finalFrame() {
+    moveTo(agent, 228, 316, 0); show(".checkFix", 1); show(".blocked", 1); show(".prodWarn", 1); show(".thought", 1);
+    show(".done", 1); show(".leak", 1); attack.setAttribute("opacity", 1); attack.setAttribute("transform", "translate(483,296)");
+    setStep(5, "The attack still gets through the save-and-reload path.");
+  }
+  function play() {
+    timers.forEach(clearTimeout); timers = [];
+    if (reduce) { finalFrame(); return; }
+    ["checkFix", "blocked", "prodWarn", "thought", "done", "leak"].forEach(function (c) { show("." + c, 0); });
+    attack.setAttribute("opacity", 0); attack.style.transition = "none"; attack.setAttribute("transform", "translate(40,70)");
+    agent.style.transition = "none"; agent.setAttribute("transform", "translate(40,70)");
+    setStep(0, "Reading the report…");
+    later(300, function () { moveTo(agent, 200, 71, 1300); });
+    later(1700, function () { setStep(1, "Fixing the check…"); show(".checkFix", 1); });
+    later(2500, function () { show(".blocked", 1); });
+    later(3400, function () { setStep(2, "Noticing the data producer…"); moveTo(agent, 190, 250, 1200); });
+    later(4400, function () { show(".prodWarn", 1); });
+    later(5200, function () { setStep(3, "Dismissing it with an assumption…"); show(".thought", 1); });
+    later(7600, function () { setStep(4, "Existing tests pass, so it stops."); show(".thought", 0); moveTo(agent, 228, 316, 900); });
+    later(8400, function () { show(".done", 1); });
+    later(9300, function () { setStep(5, "Meanwhile, the attack takes the other path…");
+      attack.setAttribute("opacity", 1); attack.style.transition = "transform 2600ms linear";
+      attack.setAttribute("transform", "translate(40,250)"); });
+    later(10000, function () { attack.style.transition = "transform 1200ms linear"; attack.setAttribute("transform", "translate(354,251)"); });
+    later(11300, function () { attack.style.transition = "transform 1300ms linear"; attack.setAttribute("transform", "translate(483,296)"); });
+    later(12500, function () { show(".leak", 1); cap.textContent = "The check was fixed. The secret still leaked."; });
+  }
+  agent.setAttribute("transform", "translate(40,70)");
+  finalFrame();  /* complete at rest: the whole story is visible before any animation runs */
+  document.getElementById("replay").addEventListener("click", play);
+
+  /* ---------- reveal chapters as they scroll in ---------- */
+  var played = {};
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      var sec = e.target;
+      if (sec.id === "top") return;
+      if (!played[sec.id]) {
+        played[sec.id] = true; sec.classList.add("on");
+        sec.querySelectorAll("[data-count]").forEach(countUp);
+        if (sec.id === "discovery") play();
+      }
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll("[data-anim]").forEach(function (s) { io.observe(s); });
+  document.querySelectorAll(".hero [data-count]").forEach(countUp);
+  new IntersectionObserver(function (es) { heroVisible = es[0].isIntersecting; }).observe(document.getElementById("top"));
+
+  /* ---------- chapter dots ---------- */
+  var dots = document.querySelectorAll(".chapters a"), ids = Array.prototype.map.call(dots, function (a) { return a.getAttribute("href").slice(1); });
+  var cio = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { var k = ids.indexOf(e.target.id);
+    dots.forEach(function (d, n) { d.classList.toggle("cur", n === k); }); } }); }, { rootMargin: "-45% 0px -50% 0px" });
+  ids.forEach(function (id) { var el = document.getElementById(id); if (el) cio.observe(el); });
+
+  /* ---------- copy ---------- */
+  document.getElementById("copy").addEventListener("click", function () {
+    var btn = this, text = "git clone https://github.com/abdulhadiadnan1080/Vanguard.git && cd Vanguard && python3 main.py --demo";
+    var done = function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy command"; }, 1600); };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () { selectCmd(); });
+    else selectCmd();
+    function selectCmd() { var r = document.createRange(); r.selectNodeContents(document.getElementById("cmd"));
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = "Press ⌘C"; }
+  });
+})();
 </script>
 </body>
 </html>
